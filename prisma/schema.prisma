@@ -1,0 +1,494 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  STUDENT
+  ADMIN
+  RECRUITER
+  COLLEGE_ADMIN
+}
+
+enum Difficulty {
+  EASY
+  MEDIUM
+  HARD
+}
+
+enum AttemptStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  SUBMITTED
+  EXPIRED
+}
+
+enum QuestionType {
+  MCQ
+  CODING
+  DESCRIPTIVE
+}
+
+enum ModerationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  FLAGGED
+}
+
+enum TargetRole {
+  SOFTWARE_ENGINEER
+  FRONTEND_DEVELOPER
+  BACKEND_DEVELOPER
+  FULL_STACK_DEVELOPER
+  DATA_ANALYST
+  DATA_ENGINEER
+  QA_ENGINEER
+  DEVOPS_ENGINEER
+  CYBERSECURITY_ENGINEER
+}
+
+model User {
+  id                   String                @id @default(uuid())
+  email                String                @unique
+  passwordHash         String?
+  name                 String
+  role                 Role                  @default(STUDENT)
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  profile              Profile?
+  attempts             Attempt[]
+  interviewExperiences InterviewExperience[]
+  createdTests         Test[]                @relation("TestCreator")
+  createdQuestions     Question[]            @relation("QuestionCreator")
+  createdNotes         LearningNote[]        @relation("NoteCreator")
+  
+  // Recruiter & College Admin properties
+  recruiterJobs        RecruiterJob[]        @relation("RecruiterJobs")
+  administeredColleges College[]             @relation("CollegeAdmin")
+  notifications        Notification[]
+  bookmarks            Bookmark[]
+  interviewVotes       InterviewExperienceVote[]
+  assessmentInvitations AssessmentInvitation[]
+}
+
+model College {
+  id          String    @id @default(uuid())
+  name        String    @unique
+  location    String?
+  adminId     String?
+  admin       User?     @relation("CollegeAdmin", fields: [adminId], references: [id])
+  students    Profile[]
+}
+
+model Profile {
+  id                String            @id @default(uuid())
+  userId            String            @unique
+  user              User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  collegeId         String?
+  college           College?          @relation(fields: [collegeId], references: [id])
+  branch            String?
+  gradYear          Int?
+  cgpa              Float?
+  resumeUrl         String?
+  resumeName        String?
+  linkedinUrl       String?
+  githubUrl         String?
+  streak            Int               @default(0)
+  lastActive        DateTime          @default(now())
+  
+  // Custom readiness targets
+  targetRole        TargetRole        @default(SOFTWARE_ENGINEER)
+  skills            Skill[]           @relation("ProfileSkills")
+  badges            UserBadge[]
+  readinessScore    StudentSkillScore?
+  roadmapProgress   RoadmapProgress[]
+  
+  // AI placeholders
+  aiResumeScore     Float?
+  aiResumeFeedback  String?
+  onboardingProfile OnboardingProfile?
+}
+
+model OnboardingProfile {
+  id                          String   @id @default(uuid())
+  profileId                   String   @unique
+  profile                     Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  targetRole                  String   @default("SOFTWARE_ENGINEER")
+  academicStage               String   @default("1st Year")
+  timeline                    String   @default("Within 6 Months")
+  objective                   String   @default("Placement Preparation")
+  targetCompanies             String   @default("") // Comma-separated list
+  confidenceAptitude          Int      @default(5)
+  confidenceReasoning         Int      @default(5)
+  confidenceVerbal            Int      @default(5)
+  confidenceDsa               Int      @default(5)
+  confidenceDbms              Int      @default(5)
+  confidenceOs                Int      @default(5)
+  confidenceCn                Int      @default(5)
+  confidenceOop               Int      @default(5)
+  confidenceSql               Int      @default(5)
+  confidenceCommunication     Int      @default(5)
+  completedOnboarding         Boolean  @default(false)
+  completedBaselineAssessment Boolean  @default(false)
+  baselineAttemptId           String?
+}
+
+model StudentSkillScore {
+  id             String   @id @default(uuid())
+  profileId      String   @unique
+  profile        Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  aptitudeScore  Float    @default(0.0)
+  reasoningScore Float    @default(0.0)
+  verbalScore    Float    @default(0.0)
+  dsaScore       Float    @default(0.0)
+  dbmsScore      Float    @default(0.0)
+  osScore        Float    @default(0.0)
+  cnScore        Float    @default(0.0)
+  oopScore       Float    @default(0.0)
+  interviewScore Float    @default(0.0)
+  overallScore   Float    @default(0.0)
+  lastUpdated    DateTime @default(now())
+}
+
+model SkillWeight {
+  id        String     @id @default(uuid())
+  role      TargetRole
+  skillName String     // e.g. "Aptitude", "DSA"
+  weight    Float      // e.g. 0.20
+  
+  @@unique([role, skillName])
+}
+
+model Skill {
+  id              String       @id @default(uuid())
+  name            String       @unique
+  profiles        Profile[]    @relation("ProfileSkills")
+}
+
+model Badge {
+  id              String       @id @default(uuid())
+  name            String       @unique // e.g., "First Test", "DBMS Expert"
+  description     String
+  icon            String       // SVG name or icon identifier
+  users           UserBadge[]
+}
+
+model UserBadge {
+  id              String       @id @default(uuid())
+  profileId       String
+  profile         Profile      @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  badgeId         String
+  badge           Badge        @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+  earnedAt        DateTime     @default(now())
+
+  @@unique([profileId, badgeId])
+}
+
+model Category {
+  id              String        @id @default(uuid())
+  name            String        @unique // Aptitude, Reasoning, Verbal, Technical
+  subCategories   SubCategory[]
+  tests           Test[]
+}
+
+model SubCategory {
+  id              String        @id @default(uuid())
+  name            String        @unique // e.g., Profit & Loss, DBMS, OOP
+  categoryId      String
+  category        Category      @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  questions       Question[]
+}
+
+model Question {
+  id              String         @id @default(uuid())
+  text            String
+  options         String         // JSON String of array of strings
+  correctAnswer   Int            // index (0 to 3)
+  explanation     String?
+  difficulty      Difficulty     @default(EASY)
+  type            QuestionType   @default(MCQ)
+  isPublished     Boolean        @default(true)
+  subCategoryId   String
+  subCategory     SubCategory    @relation(fields: [subCategoryId], references: [id], onDelete: Cascade)
+  companyTags     CompanyTag[]   @relation("QuestionCompanies")
+  testQuestions   TestQuestion[]
+  answers         Answer[]
+  createdByUserId String?
+  createdBy       User?          @relation("QuestionCreator", fields: [createdByUserId], references: [id])
+  bookmarks       Bookmark[]
+}
+
+model CompanyTag {
+  id              String         @id @default(uuid())
+  name            String         @unique // e.g., "TCS", "Infosys"
+  questions       Question[]     @relation("QuestionCompanies")
+}
+
+model Test {
+  id              String         @id @default(uuid())
+  title           String
+  description     String?
+  duration        Int            @default(60) // in minutes
+  isPublished     Boolean        @default(true)
+  categoryId      String
+  category        Category       @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  testQuestions   TestQuestion[]
+  attempts        Attempt[]
+  companyId       String?
+  company         Company?       @relation(fields: [companyId], references: [id])
+  createdByUserId String?
+  createdBy       User?          @relation("TestCreator", fields: [createdByUserId], references: [id])
+  createdAt       DateTime       @default(now())
+  
+  // Recruiter links
+  recruiterAssessments RecruiterAssessment[]
+}
+
+model TestQuestion {
+  id              String         @id @default(uuid())
+  testId          String
+  test            Test           @relation(fields: [testId], references: [id], onDelete: Cascade)
+  questionId      String
+  question        Question       @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  order           Int
+
+  @@unique([testId, questionId])
+}
+
+model Attempt {
+  id               String        @id @default(uuid())
+  testId           String
+  test             Test          @relation(fields: [testId], references: [id], onDelete: Cascade)
+  userId           String
+  user             User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  score            Int           @default(0)
+  maxScore         Int           @default(0)
+  percentage       Float         @default(0.0)
+  correctAnswers   Int           @default(0)
+  incorrectAnswers Int           @default(0)
+  status           AttemptStatus @default(NOT_STARTED)
+  startedAt        DateTime      @default(now())
+  submittedAt      DateTime?
+  warningsCount    Int           @default(0)
+  answers          Answer[]
+  result           Result?
+  
+  // AI placeholders
+  aiFeedback       String?
+}
+
+model Answer {
+  id              String         @id @default(uuid())
+  attemptId       String
+  attempt         Attempt        @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  questionId     String
+  question        Question       @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  selectedOption  Int?           // Null if not answered
+  isCorrect      Boolean        @default(false)
+  markedForReview Boolean        @default(false)
+  timeSpent       Int            @default(0) // in seconds
+}
+
+model Result {
+  id            String   @id @default(uuid())
+  attemptId     String   @unique
+  attempt       Attempt  @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  rank          Int      @default(1)
+  accuracy      Float    @default(0.0)
+  topicAnalysis String   @default("") // JSON string representing accuracy per subcategory
+}
+
+model Company {
+  id                  String         @id @default(uuid())
+  name                String         @unique // TCS, Infosys, etc.
+  logoUrl             String?
+  hiringPattern       String         // Markdown text
+  eligibilityCriteria String         // Markdown text
+  hiringRounds        CompanyRound[]
+  faqs                CompanyFaq[]
+  tests               Test[]
+  pyqs                PreviousYearQuestion[]
+  experiences         InterviewExperience[]
+}
+
+model CompanyRound {
+  id            String     @id @default(uuid())
+  companyId     String
+  company       Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  roundNumber   Int
+  roundName     String     // e.g., "Aptitude Round"
+  description   String     // Summary of what is tested
+  difficulty    Difficulty @default(MEDIUM)
+  duration      Int        // minutes
+  passingScore  Float      // percentage
+}
+
+model CompanyFaq {
+  id            String     @id @default(uuid())
+  companyId     String
+  company       Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  question      String
+  answer        String
+}
+
+model PreviousYearQuestion {
+  id          String     @id @default(uuid())
+  companyId   String
+  company     Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  year        Int
+  role        String     // e.g., SDE Intern
+  round       String     // e.g., Coding, Aptitude
+  question    String     // Markdown text
+  answer      String     // Markdown text
+  explanation String?    // Markdown text
+  difficulty  Difficulty @default(MEDIUM)
+  topic       String     // e.g., Arrays, Dynamic Programming
+}
+
+model Roadmap {
+  id          String            @id @default(uuid())
+  title       String            @unique // Software Developer, Data Analyst, etc.
+  description String
+  steps       RoadmapStep[]
+  progress    RoadmapProgress[]
+  bookmarks   Bookmark[]
+}
+
+model RoadmapStep {
+  id          String   @id @default(uuid())
+  roadmapId   String
+  roadmap     Roadmap  @relation(fields: [roadmapId], references: [id], onDelete: Cascade)
+  order       Int
+  title       String   // e.g., "Learn HTML & CSS"
+  description String
+  topics      String   // Comma separated topics
+}
+
+model RoadmapProgress {
+  id          String   @id @default(uuid())
+  profileId   String
+  profile     Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  roadmapId   String
+  roadmap     Roadmap  @relation(fields: [roadmapId], references: [id], onDelete: Cascade)
+  completedSteps String @default("") // Comma separated step IDs
+  percentageCompleted Float @default(0.0)
+
+  @@unique([profileId, roadmapId])
+}
+
+model InterviewExperience {
+  id             String                @id @default(uuid())
+  userId         String
+  user           User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  companyId      String
+  company        Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  role           String
+  questionsAsked String                // Text/Markdown questions
+  experience     String                // Description
+  difficulty     Difficulty            @default(MEDIUM)
+  selected       Boolean               @default(false)
+  status         ModerationStatus      @default(PENDING)
+  packageText    String?               // e.g. "7.5 LPA"
+  year           Int                   @default(2026)
+  roundsText     String?               // e.g. "Coding, Tech Interview, HR"
+  prepTips       String?               // Advice
+  createdAt      DateTime              @default(now())
+  votes          InterviewExperienceVote[]
+  upvoteCount    Int                   @default(0)
+  bookmarks      Bookmark[]
+}
+
+model InterviewExperienceVote {
+  id           String              @id @default(uuid())
+  experienceId String
+  experience   InterviewExperience @relation(fields: [experienceId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  voteType     String              // "HELPFUL" or "NOT_HELPFUL"
+
+  @@unique([experienceId, userId])
+}
+
+model LearningNote {
+  id              String     @id @default(uuid())
+  title           String
+  category        String     // DBMS, OS, CN, OOP, SQL
+  content         String     // Markdown notes
+  examples        String?    // Markdown examples
+  isPublished     Boolean    @default(true)
+  createdByUserId String?
+  createdBy       User?      @relation("NoteCreator", fields: [createdByUserId], references: [id])
+  createdAt       DateTime   @default(now())
+  bookmarks       Bookmark[]
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  message   String
+  type      String   // e.g. "INVITE", "CHALLENGE", "SHORTLIST", "SYSTEM"
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model Bookmark {
+  id           String               @id @default(uuid())
+  userId       String
+  user                 User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  questionId   String?
+  question     Question?            @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  noteId       String?
+  note         LearningNote?        @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  roadmapId    String?
+  roadmap      Roadmap?             @relation(fields: [roadmapId], references: [id], onDelete: Cascade)
+  experienceId String?
+  experience   InterviewExperience? @relation(fields: [experienceId], references: [id], onDelete: Cascade)
+  createdAt    DateTime             @default(now())
+}
+
+model RecruiterJob {
+  id                 String        @id @default(uuid())
+  recruiterId        String
+  recruiter          User          @relation("RecruiterJobs", fields: [recruiterId], references: [id], onDelete: Cascade)
+  title              String        // e.g. SDE Intern
+  company            String
+  description        String
+  location           String
+  salary             String?
+  jobType            String        // Full Time, Internship, Contract
+  applicationDeadline DateTime?
+  requiredSkills     String        // Comma separated list
+  experienceLevel    String        // Entry Level, Mid Level
+  collegeId          String?       // Filter to specific college if desired
+  cgpaCutoff         Float?
+  readinessCutoff    Float?
+  createdAt          DateTime      @default(now())
+  assessments        RecruiterAssessment[]
+}
+
+model RecruiterAssessment {
+  id          String        @id @default(uuid())
+  jobId       String
+  job         RecruiterJob  @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  testId      String
+  test        Test          @relation(fields: [testId], references: [id], onDelete: Cascade)
+  invitations AssessmentInvitation[]
+}
+
+model AssessmentInvitation {
+  id           String              @id @default(uuid())
+  assessmentId String
+  assessment   RecruiterAssessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  studentId    String
+  student      User                @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  status       String              @default("INVITED") // INVITED, COMPLETED, SHORTLISTED
+  score        Float?
+  createdAt    DateTime            @default(now())
+}
