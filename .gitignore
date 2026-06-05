@@ -1,8 +1,11 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+# ============================================
 
-# dependencies
-/node_modules
-/.pnp
+# Dependencies
+
+# ============================================
+
+node_modules/
+.pnp
 .pnp.*
 .yarn/*
 !.yarn/patches
@@ -10,34 +13,169 @@
 !.yarn/releases
 !.yarn/versions
 
-# testing
-/coverage
+# ============================================
 
-# next.js
-/.next/
-/out/
+# Next.js
 
-# production
-/build
+# ============================================
 
-# misc
-.DS_Store
-*.pem
+.next/
+out/
+build/
 
-# debug
+# ============================================
+
+# Coverage & Testing
+
+# ============================================
+
+coverage/
+.nyc_output/
+
+# ============================================
+
+# Environment Variables (VERY IMPORTANT)
+
+# ============================================
+
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env*
+
+# ============================================
+
+# Prisma
+
+# ============================================
+
+src/generated/prisma/
+
+# Local SQLite databases
+
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+
+prisma/dev.db
+prisma/dev.db-journal
+
+# ============================================
+
+# Logs
+
+# ============================================
+
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-.pnpm-debug.log*
+pnpm-debug.log*
+*.log
 
-# env files (can opt-in for committing if needed)
-.env*
+# ============================================
 
-# vercel
-.vercel
+# OS Files
 
-# typescript
+# ============================================
+
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ============================================
+
+# IDE
+
+# ============================================
+
+.vscode/
+.idea/
+
+# ============================================
+
+# Vercel
+
+# ============================================
+
+.vercel/
+
+# ============================================
+
+# TypeScript
+
+# ============================================
+
 *.tsbuildinfo
 next-env.d.ts
 
-/src/generated/prisma
+# ============================================
+
+# Uploads (User Files)
+
+# ============================================
+
+public/uploads/
+uploads/
+
+# ============================================
+
+# Generated Reports
+
+# ============================================
+
+reports/
+audit/
+exports/
+
+# ============================================
+
+# Temporary Files
+
+# ============================================
+
+tmp/
+temp/
+.cache/
+
+# ============================================
+
+# Windows Shortcuts
+
+# ============================================
+
+*.lnk
+
+# ============================================
+
+# Build Artifacts
+
+# ============================================
+
+dist/
+
+# ============================================
+
+# Misc Secrets
+
+# ============================================
+
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+
+# ============================================
+
+# PlacementHub Specific
+
+# ============================================
+
+resume-uploads/
+candidate-exports/
+assessment-results/
+generated-reports/
+local-backups/
