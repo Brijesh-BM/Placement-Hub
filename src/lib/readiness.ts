@@ -41,7 +41,9 @@ export async function calculateReadinessScore(profileId: string) {
     attempts.forEach((att) => {
       if (att.result && att.result.topicAnalysis) {
         try {
-          const analysis = JSON.parse(att.result.topicAnalysis); // { DBMS: 90, OS: 60, ... }
+          const analysis = typeof att.result.topicAnalysis === 'string'
+            ? JSON.parse(att.result.topicAnalysis)
+            : (att.result.topicAnalysis as any || {});
           Object.keys(analysis).forEach((topicName) => {
             const percentage = analysis[topicName];
             
@@ -140,6 +142,15 @@ export async function calculateReadinessScore(profileId: string) {
         oopScore: skillAverages['OOP'] || 0.0,
         interviewScore: skillAverages['Interview'] || 70.0,
         overallScore,
+      }
+    });
+
+    // Save to time-series history
+    await db.studentSkillScoreHistory.create({
+      data: {
+        profileId: profile.id,
+        skillName: 'Overall',
+        score: overallScore,
       }
     });
 

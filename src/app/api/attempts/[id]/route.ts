@@ -78,15 +78,11 @@ export async function GET(
       });
     }
 
-    // Sanitize and format questions
     const formattedQuestions = attempt.test.testQuestions.map((tq) => {
       const q = tq.question;
-      let opts = [];
-      try {
-        opts = JSON.parse(q.options);
-      } catch (e) {
-        opts = q.options.split(',');
-      }
+      const opts = Array.isArray(q.options)
+        ? q.options
+        : (typeof q.options === 'string' ? JSON.parse(q.options) : []);
 
       // Find if student previously answered this question in this session
       const savedAns = attempt.answers.find(a => a.questionId === q.id);

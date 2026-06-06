@@ -6,7 +6,7 @@ export async function GET() {
   try {
     const userPayload = await getCurrentUser();
     if (!userPayload) {
-      const response = NextResponse.json({ user: null }, { status: 401 });
+      const response = NextResponse.json({ user: null }, { status: 200 });
       response.cookies.delete('placementhub_token');
       return response;
     }

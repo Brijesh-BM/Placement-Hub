@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { GraduationCap, Users, TrendingUp, BookOpen, Search, Filter, Loader2, ArrowRight, CheckCircle2, ChevronRight, Sparkles, ShieldCheck, AlertCircle, Award } from 'lucide-react';
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
+import { ResponsiveContainer, BarChart, Bar, LineChart, Line, Legend, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 
 interface Student {
   id: string;
@@ -32,11 +32,23 @@ interface Stats {
   };
 }
 
+interface PlacementReport {
+  id: string;
+  collegeId: string;
+  year: number;
+  totalStudents: number;
+  placedStudents: number;
+  avgPackage: number;
+  topPackage: number;
+  topRecruiters: string[];
+}
+
 interface CollegeData {
   collegeName: string;
   collegeLocation: string | null;
   stats: Stats;
   students: Student[];
+  placementReports?: PlacementReport[];
 }
 
 export default function CollegeAdminPortal() {
@@ -110,11 +122,15 @@ export default function CollegeAdminPortal() {
 
   // Recharts readiness distribution data
   const distributionData = [
-    { name: 'Beginner (0-44)', Count: data.students.filter(s => (s.readinessScore || 0) < 45).length + 3 },
-    { name: 'Developing (45-69)', Count: data.students.filter(s => (s.readinessScore || 0) >= 45 && (s.readinessScore || 0) < 70).length + 8 },
-    { name: 'Placement Ready (70-79)', Count: data.students.filter(s => (s.readinessScore || 0) >= 70 && (s.readinessScore || 0) < 80).length + 12 },
-    { name: 'Elite (80-100)', Count: data.students.filter(s => (s.readinessScore || 0) >= 80).length + 4 }
+    { name: 'Beginner (0-44)', Count: data.students.filter(s => (s.readinessScore || 0) < 45).length },
+    { name: 'Developing (45-69)', Count: data.students.filter(s => (s.readinessScore || 0) >= 45 && (s.readinessScore || 0) < 70).length },
+    { name: 'Placement Ready (70-79)', Count: data.students.filter(s => (s.readinessScore || 0) >= 70 && (s.readinessScore || 0) < 80).length },
+    { name: 'Elite (80-100)', Count: data.students.filter(s => (s.readinessScore || 0) >= 80).length }
   ];
+
+  // Placement history reports processing
+  const reports = data.placementReports || [];
+  const latestReport = reports.length > 0 ? reports[reports.length - 1] : null;
 
   return (
     <div className="flex-1 bg-slate-50 min-h-screen">
@@ -139,7 +155,7 @@ export default function CollegeAdminPortal() {
           <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex items-center justify-between">
             <div className="space-y-1">
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Total Students</span>
-              <h3 className="text-3xl font-black text-slate-800">{data.stats.studentCount || 1200}</h3>
+              <h3 className="text-3xl font-black text-slate-800">{data.stats.studentCount}</h3>
             </div>
             <div className="p-3 bg-indigo-50 border border-indigo-100 text-indigo-600 rounded-xl">
               <Users className="h-5 w-5" />
@@ -150,7 +166,7 @@ export default function CollegeAdminPortal() {
             <div className="space-y-1">
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Interview Ready</span>
               <h3 className="text-3xl font-black text-slate-800">
-                {data.students.filter(s => (s.readinessScore || 0) >= 70).length + 450}
+                {data.students.filter(s => (s.readinessScore || 0) >= 70).length}
               </h3>
             </div>
             <div className="p-3 bg-indigo-50 border border-indigo-100 text-indigo-600 rounded-xl">
@@ -160,8 +176,12 @@ export default function CollegeAdminPortal() {
 
           <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex items-center justify-between">
             <div className="space-y-1">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Placed Students</span>
-              <h3 className="text-3xl font-black text-slate-800">320</h3>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                Placed Students {latestReport ? `(${latestReport.year})` : ''}
+              </span>
+              <h3 className="text-3xl font-black text-slate-800">
+                {latestReport ? latestReport.placedStudents : 0}
+              </h3>
             </div>
             <div className="p-3 bg-indigo-50 border border-indigo-100 text-indigo-600 rounded-xl">
               <CheckCircle2 className="h-5 w-5" />
@@ -306,6 +326,126 @@ export default function CollegeAdminPortal() {
           </div>
 
         </div>
+
+        {/* PLACEMENT HISTORY & ANALYTICS */}
+        {reports.length > 0 && (
+          <div className="space-y-6">
+            <div className="border-b border-slate-200 pb-4 text-left">
+              <h2 className="text-xl font-extrabold text-slate-800 tracking-tight">
+                Historical Placement Performance & Salary Package Trends
+              </h2>
+              <p className="text-slate-500 text-xs font-semibold mt-1">
+                Detailed campus salary package progression and year-on-year placement rates
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Package Trends Chart */}
+              <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex flex-col justify-between">
+                <div className="space-y-1 mb-4 text-left">
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-400 block">Salary Package Growth</span>
+                  <p className="text-xs text-slate-500 font-semibold">Average vs Top packages offered (in LPA)</p>
+                </div>
+                <div className="h-64 w-full">
+                  {mounted ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart
+                        data={reports.map(r => ({
+                          Year: r.year.toString(),
+                          'Average Package (LPA)': r.avgPackage,
+                          'Top Package (LPA)': r.topPackage,
+                        }))}
+                        margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                        <XAxis dataKey="Year" stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={false} />
+                        <YAxis stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={false} unit="L" />
+                        <Tooltip contentStyle={{ borderRadius: '8px', fontSize: '11px', fontWeight: 'bold' }} />
+                        <Legend verticalAlign="top" height={36} iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold' }} />
+                        <Line type="monotone" dataKey="Average Package (LPA)" stroke="#6366f1" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                        <Line type="monotone" dataKey="Top Package (LPA)" stroke="#10b981" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="h-full w-full bg-slate-100 animate-pulse rounded-xl" />
+                  )}
+                </div>
+              </div>
+
+              {/* Placement Percentage Rate Chart */}
+              <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex flex-col justify-between">
+                <div className="space-y-1 mb-4 text-left">
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-400 block">Placement Rate Trends</span>
+                  <p className="text-xs text-slate-500 font-semibold">Percentage of total students successfully placed</p>
+                </div>
+                <div className="h-64 w-full">
+                  {mounted ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart
+                        data={reports.map(r => ({
+                          Year: r.year.toString(),
+                          'Placement Rate (%)': parseFloat(((r.placedStudents / r.totalStudents) * 100).toFixed(1)),
+                        }))}
+                        margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                        <XAxis dataKey="Year" stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={false} />
+                        <YAxis stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={false} unit="%" domain={[0, 100]} />
+                        <Tooltip contentStyle={{ borderRadius: '8px', fontSize: '11px', fontWeight: 'bold' }} />
+                        <Bar dataKey="Placement Rate (%)" fill="#4f46e5" radius={[6, 6, 0, 0]} barSize={40} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="h-full w-full bg-slate-100 animate-pulse rounded-xl" />
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Placement Summary Table */}
+            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm text-left">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-4">Historical Placement Summary</span>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm whitespace-nowrap">
+                  <thead>
+                    <tr className="border-b border-slate-205 text-slate-550 font-bold bg-slate-50 text-xs uppercase tracking-wider">
+                      <th className="py-3 px-4">Year</th>
+                      <th className="py-3 px-4 text-center">Total Students</th>
+                      <th className="py-3 px-4 text-center">Placed Students</th>
+                      <th className="py-3 px-4 text-center">Placement Rate</th>
+                      <th className="py-3 px-4 text-center">Avg Package</th>
+                      <th className="py-3 px-4 text-center">Top Package</th>
+                      <th className="py-3 px-4">Top Recruiters</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 text-slate-700">
+                    {reports.map((r) => (
+                      <tr key={r.id} className="hover:bg-slate-50/50 transition">
+                        <td className="py-3 px-4 font-bold text-slate-800">{r.year}</td>
+                        <td className="py-3 px-4 text-center">{r.totalStudents}</td>
+                        <td className="py-3 px-4 text-center">{r.placedStudents}</td>
+                        <td className="py-3 px-4 text-center font-semibold text-indigo-700">
+                          {((r.placedStudents / r.totalStudents) * 100).toFixed(1)}%
+                        </td>
+                        <td className="py-3 px-4 text-center font-bold text-slate-800">{r.avgPackage} LPA</td>
+                        <td className="py-3 px-4 text-center font-bold text-emerald-600">{r.topPackage} LPA</td>
+                        <td className="py-3 px-4">
+                          <div className="flex flex-wrap gap-1.5">
+                            {r.topRecruiters.map((recruiterName) => (
+                              <span key={recruiterName} className="inline-flex px-2 py-0.5 rounded bg-indigo-50 border border-indigo-100 text-indigo-700 text-[10px] font-bold">
+                                {recruiterName}
+                              </span>
+                            ))}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* CANDIDATE ROSTER DETAILS */}
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">

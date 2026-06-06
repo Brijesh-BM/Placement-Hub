@@ -48,6 +48,8 @@ export async function GET(request: Request) {
   }
 }
 
+import { questionCreateSchema } from '@/lib/validation';
+
 export async function POST(request: Request) {
   try {
     const userPayload = await getCurrentUser();
@@ -56,13 +58,15 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { text, options, correctAnswer, explanation, difficulty, subCategoryId, companyTags } = body;
-
-    if (!text || !options || correctAnswer === undefined || !subCategoryId) {
-      return NextResponse.json({ error: 'Missing required parameters.' }, { status: 400 });
+    const validation = questionCreateSchema.safeParse(body);
+    if (!validation.success) {
+      return NextResponse.json(
+        { error: validation.error.issues[0].message },
+        { status: 400 }
+      );
     }
 
-    const optionsStr = Array.isArray(options) ? JSON.stringify(options) : options;
+    const { text, options, correctAnswer, explanation, difficulty, subCategoryId, companyTags } = validation.data;
 
     // Resolve company tags relations
     const tagConnects: any[] = [];
@@ -82,8 +86,8 @@ export async function POST(request: Request) {
     const newQuestion = await db.question.create({
       data: {
         text,
-        options: optionsStr,
-        correctAnswer: parseInt(correctAnswer, 10),
+        options: options,
+        correctAnswer: correctAnswer,
         explanation: explanation || null,
         difficulty: (difficulty || 'EASY') as any,
         subCategoryId,

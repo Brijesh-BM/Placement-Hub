@@ -1,7 +1,6 @@
 'use client';
 
-import { useSearchParams } from 'next/navigation';
-import { useEffect, useState, Suspense } from 'react';
+import { useEffect, useState } from 'react';
 import { Search, Loader2, ArrowRight, FileText, Compass, Map, Building2, MessageSquare, BookOpen, Tag, Briefcase, HelpCircle, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 
@@ -17,10 +16,8 @@ interface SearchResults {
   rounds: Array<{ id: string; roundName: string; description: string; company: { name: string } }>;
 }
 
-function SearchResultsComponent() {
-  const searchParams = useSearchParams();
-  const query = searchParams?.get('q') || '';
-  const [keyword, setKeyword] = useState(query);
+export default function SearchPage() {
+  const [keyword, setKeyword] = useState('');
   const [results, setResults] = useState<SearchResults | null>(null);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'all' | 'tests' | 'pyqs' | 'jobs' | 'notes' | 'experiences'>('all');
@@ -42,11 +39,15 @@ function SearchResultsComponent() {
   };
 
   useEffect(() => {
-    if (query) {
-      setKeyword(query);
-      executeSearch(query);
+    if (typeof window !== 'undefined') {
+      const searchParams = new URLSearchParams(window.location.search);
+      const query = searchParams.get('q') || '';
+      if (query) {
+        setKeyword(query);
+        executeSearch(query);
+      }
     }
-  }, [query]);
+  }, []);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -319,18 +320,5 @@ function SearchResultsComponent() {
 
       </div>
     </div>
-  );
-}
-
-export default function SearchPage() {
-  return (
-    <Suspense fallback={
-      <div className="flex-1 flex flex-col items-center justify-center p-8 bg-slate-50 min-h-screen">
-        <Loader2 className="h-8 w-8 text-indigo-650 animate-spin" />
-        <span className="text-slate-550 mt-4 text-sm font-semibold">Initializing search engine...</span>
-      </div>
-    }>
-      <SearchResultsComponent />
-    </Suspense>
   );
 }

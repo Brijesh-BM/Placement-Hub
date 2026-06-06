@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { TargetRole } from '@prisma/client';
+import { onboardingSchema } from '@/lib/validation';
 
 export async function POST(request: Request) {
   try {
@@ -10,11 +11,17 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { targetRole, academicStage, timeline, objective, targetCompanies, confidence } = await request.json();
+    const body = await request.json();
+    const validation = onboardingSchema.safeParse(body);
 
-    if (!targetRole || !academicStage || !timeline || !objective || !Array.isArray(targetCompanies) || !confidence) {
-      return NextResponse.json({ error: 'Missing onboarding parameters' }, { status: 400 });
+    if (!validation.success) {
+      return NextResponse.json(
+        { error: validation.error.issues[0].message },
+        { status: 400 }
+      );
     }
+
+    const { targetRole, academicStage, timeline, objective, targetCompanies, confidence } = validation.data;
 
     // 1. Fetch student profile
     const profile = await db.profile.findUnique({
@@ -48,7 +55,7 @@ export async function POST(request: Request) {
         academicStage,
         timeline,
         objective,
-        targetCompanies: targetCompanies.join(', '),
+        targetCompanies: targetCompanies,
         confidenceAptitude: confidence.Aptitude || 5,
         confidenceReasoning: confidence.Reasoning || 5,
         confidenceVerbal: confidence.Verbal || 5,
@@ -67,7 +74,7 @@ export async function POST(request: Request) {
         academicStage,
         timeline,
         objective,
-        targetCompanies: targetCompanies.join(', '),
+        targetCompanies: targetCompanies,
         confidenceAptitude: confidence.Aptitude || 5,
         confidenceReasoning: confidence.Reasoning || 5,
         confidenceVerbal: confidence.Verbal || 5,

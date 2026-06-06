@@ -58,15 +58,11 @@ export async function GET(
       return NextResponse.json({ error: 'Attempt has not been submitted yet.' }, { status: 400 });
     }
 
-    // Format answers detail review
     const answersReview = attempt.answers.map(ans => {
       const q = ans.question;
-      let opts = [];
-      try {
-        opts = JSON.parse(q.options);
-      } catch (e) {
-        opts = q.options.split(',');
-      }
+      const opts = Array.isArray(q.options)
+        ? q.options
+        : (typeof q.options === 'string' ? JSON.parse(q.options) : []);
 
       return {
         questionId: q.id,
@@ -106,7 +102,9 @@ export async function GET(
         id: attempt.result.id,
         rank: attempt.result.rank,
         accuracy: attempt.result.accuracy,
-        topicAnalysis: JSON.parse(attempt.result.topicAnalysis || '{}'),
+        topicAnalysis: typeof attempt.result.topicAnalysis === 'string'
+          ? JSON.parse(attempt.result.topicAnalysis)
+          : (attempt.result.topicAnalysis || {}),
       } : null,
       answers: answersReview,
     });

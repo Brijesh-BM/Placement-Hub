@@ -256,6 +256,25 @@ export default function TestEnginePage() {
   }
 
   const currentQ = questions[currentIdx];
+  if (!currentQ) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center p-8 bg-slate-50 min-h-screen text-center">
+        <div className="max-w-md p-6 bg-white border border-slate-200 rounded-2xl shadow-sm space-y-4">
+          <span className="text-sm font-bold text-slate-500 block">No Questions Found</span>
+          <p className="text-xs text-slate-405 font-semibold leading-relaxed">
+            This assessment does not contain any questions. Please return to the dashboard.
+          </p>
+          <button
+            onClick={() => router.push('/dashboard')}
+            className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition shadow-sm"
+          >
+            Return to Dashboard
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   const isAnswered = selections[currentQ.id] !== null;
   const isMarked = reviewed[currentQ.id];
 

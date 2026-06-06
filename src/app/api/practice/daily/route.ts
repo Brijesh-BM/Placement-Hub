@@ -36,12 +36,9 @@ export async function GET() {
 
     // Sanitize options and remove correctAnswer key
     const sanitizedSet = dailySet.map((q, idx) => {
-      let opts = [];
-      try {
-        opts = JSON.parse(q.options);
-      } catch (e) {
-        opts = q.options.split(',');
-      }
+      const opts = Array.isArray(q.options)
+        ? q.options
+        : (typeof q.options === 'string' ? JSON.parse(q.options) : []);
 
       return {
         id: q.id,

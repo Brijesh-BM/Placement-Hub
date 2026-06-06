@@ -23,7 +23,7 @@ interface AttemptData {
   };
   result: {
     accuracy: number;
-    topicAnalysis: string; // JSON
+    topicAnalysis: any; // JSON object or string
   } | null;
 }
 
@@ -78,7 +78,9 @@ export default function PlacementSnapshotPage() {
   
   if (data?.result?.topicAnalysis) {
     try {
-      const topicScores = JSON.parse(data.result.topicAnalysis); // { DBMS: 90, OS: 50 }
+      const topicScores = typeof data.result.topicAnalysis === 'string'
+        ? JSON.parse(data.result.topicAnalysis)
+        : (data.result.topicAnalysis || {});
       Object.keys(topicScores).forEach(topic => {
         if (topicScores[topic] >= 75) {
           strengths.push(topic);

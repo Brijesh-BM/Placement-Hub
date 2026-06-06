@@ -29,13 +29,12 @@ export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const token = request.cookies.get(COOKIE_NAME)?.value;
 
-  // 1. Redirect root to /dashboard or /login
+  // 1. Redirect root to /dashboard if logged in
   if (pathname === '/') {
     if (token) {
       return NextResponse.redirect(new URL('/dashboard', request.url));
-    } else {
-      return NextResponse.redirect(new URL('/login', request.url));
     }
+    // Logged-out users can view the landing page at /
   }
 
   // 2. Check if the path is protected

@@ -74,6 +74,16 @@ model User {
   bookmarks            Bookmark[]
   interviewVotes       InterviewExperienceVote[]
   assessmentInvitations AssessmentInvitation[]
+
+  // New relation connections
+  dailyChallengeCompletions DailyChallengeCompletion[]
+  mockInterviews            MockInterview[]
+  codingSubmissions         CodingSubmission[]
+  studyPlans                StudyPlan[]
+  passwordResetTokens       PasswordResetToken[]
+  emailVerificationTokens   EmailVerificationToken[]
+  practiceSessions          PracticeSession[]
+  activities                UserActivity[]
 }
 
 model College {
@@ -83,6 +93,9 @@ model College {
   adminId     String?
   admin       User?     @relation("CollegeAdmin", fields: [adminId], references: [id])
   students    Profile[]
+
+  // New relation connections
+  placementReports CollegePlacementReport[]
 }
 
 model Profile {
@@ -99,6 +112,7 @@ model Profile {
   linkedinUrl       String?
   githubUrl         String?
   streak            Int               @default(0)
+  lastStreakDate    DateTime?         // New field: correctly track streaks on a calendar basis
   lastActive        DateTime          @default(now())
   
   // Custom readiness targets
@@ -108,10 +122,16 @@ model Profile {
   readinessScore    StudentSkillScore?
   roadmapProgress   RoadmapProgress[]
   
+  // New relation connections
+  roadmapCompletions RoadmapStepCompletion[]
+  skillScoreHistory  StudentSkillScoreHistory[]
+
   // AI placeholders
   aiResumeScore     Float?
   aiResumeFeedback  String?
   onboardingProfile OnboardingProfile?
+
+  @@index([collegeId])
 }
 
 model OnboardingProfile {
@@ -122,7 +142,7 @@ model OnboardingProfile {
   academicStage               String   @default("1st Year")
   timeline                    String   @default("Within 6 Months")
   objective                   String   @default("Placement Preparation")
-  targetCompanies             String   @default("") // Comma-separated list
+  targetCompanies             Json     @default(dbgenerated("'[]'"))
   confidenceAptitude          Int      @default(5)
   confidenceReasoning         Int      @default(5)
   confidenceVerbal            Int      @default(5)
@@ -207,7 +227,7 @@ model SubCategory {
 model Question {
   id              String         @id @default(uuid())
   text            String
-  options         String         // JSON String of array of strings
+  options         Json           // Refactored from string to native JSON array of options
   correctAnswer   Int            // index (0 to 3)
   explanation     String?
   difficulty      Difficulty     @default(EASY)
@@ -221,6 +241,13 @@ model Question {
   createdByUserId String?
   createdBy       User?          @relation("QuestionCreator", fields: [createdByUserId], references: [id])
   bookmarks       Bookmark[]
+  
+  // Relation connections
+  dailyChallenges DailyChallenge[]
+
+  @@index([subCategoryId])
+  @@index([difficulty])
+  @@index([isPublished])
 }
 
 model CompanyTag {
@@ -277,21 +304,26 @@ model Attempt {
   warningsCount    Int           @default(0)
   answers          Answer[]
   result           Result?
-  
-  // AI placeholders
   aiFeedback       String?
+
+  @@index([userId])
+  @@index([testId])
+  @@index([status])
 }
 
 model Answer {
   id              String         @id @default(uuid())
   attemptId       String
   attempt         Attempt        @relation(fields: [attemptId], references: [id], onDelete: Cascade)
-  questionId     String
+  questionId      String
   question        Question       @relation(fields: [questionId], references: [id], onDelete: Cascade)
   selectedOption  Int?           // Null if not answered
-  isCorrect      Boolean        @default(false)
+  isCorrect       Boolean        @default(false)
   markedForReview Boolean        @default(false)
   timeSpent       Int            @default(0) // in seconds
+
+  @@index([attemptId])
+  @@index([questionId])
 }
 
 model Result {
@@ -300,7 +332,7 @@ model Result {
   attempt       Attempt  @relation(fields: [attemptId], references: [id], onDelete: Cascade)
   rank          Int      @default(1)
   accuracy      Float    @default(0.0)
-  topicAnalysis String   @default("") // JSON string representing accuracy per subcategory
+  topicAnalysis Json     @default(dbgenerated("'{}'")) // Refactored from string to native JSON
 }
 
 model Company {
@@ -366,7 +398,10 @@ model RoadmapStep {
   order       Int
   title       String   // e.g., "Learn HTML & CSS"
   description String
-  topics      String   // Comma separated topics
+  topics      Json     @default(dbgenerated("'[]'"))
+
+  // Relations
+  completions RoadmapStepCompletion[]
 }
 
 model RoadmapProgress {
@@ -375,10 +410,22 @@ model RoadmapProgress {
   profile     Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
   roadmapId   String
   roadmap     Roadmap  @relation(fields: [roadmapId], references: [id], onDelete: Cascade)
-  completedSteps String @default("") // Comma separated step IDs
-  percentageCompleted Float @default(0.0)
+  percentageCompleted Float @default(0.0) // completedSteps string is removed in favor of RoadmapStepCompletion
 
   @@unique([profileId, roadmapId])
+}
+
+// New relational model for roadmap completions
+model RoadmapStepCompletion {
+  id          String      @id @default(uuid())
+  profileId   String
+  profile     Profile     @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  stepId      String
+  step        RoadmapStep @relation(fields: [stepId], references: [id], onDelete: Cascade)
+  completedAt DateTime    @default(now())
+  timeSpent   Int         @default(0) // in seconds
+
+  @@unique([profileId, stepId])
 }
 
 model InterviewExperience {
@@ -401,6 +448,10 @@ model InterviewExperience {
   votes          InterviewExperienceVote[]
   upvoteCount    Int                   @default(0)
   bookmarks      Bookmark[]
+
+  @@index([companyId])
+  @@index([status])
+  @@index([upvoteCount])
 }
 
 model InterviewExperienceVote {
@@ -417,7 +468,7 @@ model InterviewExperienceVote {
 model LearningNote {
   id              String     @id @default(uuid())
   title           String
-  category        String     // DBMS, OS, CN, OOP, SQL
+  category        String     // DBMS, OS, CN, OOP, SQL (Plain string retained for quick category tags)
   content         String     // Markdown notes
   examples        String?    // Markdown examples
   isPublished     Boolean    @default(true)
@@ -436,6 +487,8 @@ model Notification {
   type      String   // e.g. "INVITE", "CHALLENGE", "SHORTLIST", "SYSTEM"
   isRead    Boolean  @default(false)
   createdAt DateTime @default(now())
+
+  @@index([userId, isRead])
 }
 
 model Bookmark {
@@ -464,7 +517,7 @@ model RecruiterJob {
   salary             String?
   jobType            String        // Full Time, Internship, Contract
   applicationDeadline DateTime?
-  requiredSkills     String        // Comma separated list
+  requiredSkills     Json          @default(dbgenerated("'[]'"))
   experienceLevel    String        // Entry Level, Mid Level
   collegeId          String?       // Filter to specific college if desired
   cgpaCutoff         Float?
@@ -491,4 +544,163 @@ model AssessmentInvitation {
   status       String              @default("INVITED") // INVITED, COMPLETED, SHORTLISTED
   score        Float?
   createdAt    DateTime            @default(now())
+
+  @@index([studentId])
+  @@index([assessmentId])
+}
+
+// --- NEW MVP MODELS FOR LAUNCH READINESS ---
+
+model DailyChallenge {
+  id          String   @id @default(uuid())
+  date        DateTime @unique
+  questionId  String
+  question    Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  type        String   // MCQ, CODING, etc.
+  theme       String?  // e.g. "DBMS Monday"
+  completions DailyChallengeCompletion[]
+}
+
+model DailyChallengeCompletion {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  challengeId String
+  challenge   DailyChallenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  completedAt DateTime @default(now())
+  score       Int      @default(0)
+
+  @@unique([userId, challengeId])
+}
+
+model StudentSkillScoreHistory {
+  id          String   @id @default(uuid())
+  profileId   String
+  profile     Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  date        DateTime @default(now())
+  skillName   String
+  score       Float
+
+  @@index([profileId])
+}
+
+model MockInterview {
+  id             String   @id @default(uuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type           String   // TECHNICAL, HR, SYSTEM_DESIGN
+  questions      Json     // list of questions asked
+  responses      Json     // list of answers submitted
+  aiFeedbackJson Json?    // parsed AI response assessment
+  score          Float    @default(0.0)
+  createdAt      DateTime @default(now())
+
+  @@index([userId])
+}
+
+model CodingQuestion {
+  id             String   @id @default(uuid())
+  title          String
+  description    String
+  constraints    String?
+  inputFormat    String?
+  outputFormat   String?
+  sampleInput    String?
+  sampleOutput   String?
+  testCasesJson  Json     // list of test cases e.g. [{input: "...", output: "..."}]
+  solution       String?
+  timeLimit      Int      @default(1000) // in ms
+  memoryLimit    Int      @default(256)  // in MB
+  language       String   @default("CPP")
+  companyTags    Json     @default(dbgenerated("'[]'"))
+  submissions    CodingSubmission[]
+}
+
+model CodingSubmission {
+  id             String   @id @default(uuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  questionId     String
+  question       CodingQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  code           String
+  language       String
+  status         String   // ACCEPTED, WRONG_ANSWER, TLE, MLE
+  passedCases    Int      @default(0)
+  totalCases     Int      @default(0)
+  executionTime  Int      @default(0) // in ms
+  createdAt      DateTime @default(now())
+
+  @@index([userId])
+  @@index([questionId])
+}
+
+model StudyPlan {
+  id             String   @id @default(uuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title          String
+  startDate      DateTime
+  targetDate     DateTime
+  targetCompanies Json     @default(dbgenerated("'[]'"))
+  dailyHours     Float
+  generatedPlanJson Json
+
+  @@index([userId])
+}
+
+model CollegePlacementReport {
+  id             String   @id @default(uuid())
+  collegeId      String
+  college        College  @relation(fields: [collegeId], references: [id], onDelete: Cascade)
+  year           Int
+  totalStudents  Int
+  placedStudents Int
+  avgPackage     Float
+  topPackage     Float
+  topRecruiters  Json     @default(dbgenerated("'[]'"))
+
+  @@unique([collegeId, year])
+}
+
+model PasswordResetToken {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String   @unique
+  expiresAt DateTime
+
+  @@index([userId])
+}
+
+model EmailVerificationToken {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String   @unique
+  expiresAt DateTime
+
+  @@index([userId])
+}
+
+model PracticeSession {
+  id                 String   @id @default(uuid())
+  userId             String
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date               DateTime @default(now())
+  questionsAttempted Int      @default(0)
+  timeSpent          Int      @default(0) // in seconds
+  topicsRevised      Json     @default(dbgenerated("'[]'"))
+
+  @@index([userId])
+}
+
+model UserActivity {
+  id           String   @id @default(uuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  activityType String   // e.g. LOGIN, TEST_SUBMITTED, ROADMAP_STEP_COMPLETED
+  metadata     Json?
+  createdAt    DateTime @default(now())
+
+  @@index([userId])
 }

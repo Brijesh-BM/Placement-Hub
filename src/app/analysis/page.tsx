@@ -1,13 +1,12 @@
 'use client';
 
-import { useEffect, useState, Suspense } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Loader2, Check, Sparkles } from 'lucide-react';
 
-function AnalysisContent() {
+export default function AnalysisPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const attemptId = searchParams.get('attemptId');
+  const [attemptId, setAttemptId] = useState<string | null>(null);
 
   const [step, setStep] = useState(0);
   const steps = [
@@ -19,7 +18,14 @@ function AnalysisContent() {
   ];
 
   useEffect(() => {
-    if (!attemptId) {
+    let id: string | null = null;
+    if (typeof window !== 'undefined') {
+      const searchParams = new URLSearchParams(window.location.search);
+      id = searchParams.get('attemptId');
+      setAttemptId(id);
+    }
+
+    if (!id) {
       router.push('/dashboard');
       return;
     }
@@ -106,17 +112,5 @@ function AnalysisContent() {
 
       </div>
     </div>
-  );
-}
-
-export default function AnalysisPage() {
-  return (
-    <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <Loader2 className="h-8 w-8 text-indigo-600 animate-spin" />
-      </div>
-    }>
-      <AnalysisContent />
-    </Suspense>
   );
 }

@@ -52,11 +52,29 @@ export default function BaselineInfoPage() {
     checkUserAndFetchId();
   }, [router]);
 
-  const handleStart = () => {
-    if (testId) {
-      router.push(`/test-engine/${testId}`);
-    } else {
+  const handleStart = async () => {
+    if (!testId) {
       alert('Baseline Assessment not found. Please contact support.');
+      return;
+    }
+    setLoading(true);
+
+    try {
+      const res = await fetch('/api/attempts/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ testId }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to start attempt.');
+      }
+
+      router.push(`/test-engine/${data.attempt.id}`);
+    } catch (e: any) {
+      alert(e.message || 'Error starting assessment');
+      setLoading(false);
     }
   };
 

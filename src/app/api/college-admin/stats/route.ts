@@ -90,6 +90,12 @@ export async function GET() {
     } : {
       DSA: 0, DBMS: 0, OS: 0, CN: 0, OOP: 0, Aptitude: 0, Reasoning: 0, Verbal: 0
     };
+    
+    // Fetch historical placement reports
+    const placementReports = await db.collegePlacementReport.findMany({
+      where: { collegeId: college.id },
+      orderBy: { year: 'asc' },
+    });
 
     return NextResponse.json({
       collegeName: college.name,
@@ -101,6 +107,7 @@ export async function GET() {
         subjectAverages,
       },
       students: studentsList,
+      placementReports,
     });
   } catch (error) {
     console.error('Fetch college stats failed:', error);

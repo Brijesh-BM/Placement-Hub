@@ -77,19 +77,19 @@ export default async function HomePage() {
         {/* Platform Stat Diagnostics (High Information Density) */}
         <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xl grid grid-cols-2 md:grid-cols-4 gap-6 text-left max-w-3xl mx-auto">
           <div className="space-y-1">
-            <span className="text-2xl font-black text-slate-800 block">25,000+</span>
+            <span className="text-2xl font-black text-slate-800 block">500+</span>
             <span className="text-[10px] text-slate-400 font-bold uppercase block tracking-wider">Practice Questions</span>
           </div>
           <div className="space-y-1 border-l border-slate-100 pl-6">
-            <span className="text-2xl font-black text-slate-800 block">500+</span>
+            <span className="text-2xl font-black text-slate-800 block">10+</span>
             <span className="text-[10px] text-slate-400 font-bold uppercase block tracking-wider">Simulated Mocks</span>
           </div>
           <div className="space-y-1 border-l border-slate-100 pl-6">
-            <span className="text-2xl font-black text-slate-800 block">1,000+</span>
+            <span className="text-2xl font-black text-slate-800 block">50+</span>
             <span className="text-[10px] text-slate-400 font-bold uppercase block tracking-wider">Interview Logs</span>
           </div>
           <div className="space-y-1 border-l border-slate-100 pl-6">
-            <span className="text-2xl font-black text-slate-800 block">100+</span>
+            <span className="text-2xl font-black text-slate-800 block">5+</span>
             <span className="text-[10px] text-slate-400 font-bold uppercase block tracking-wider">Companies</span>
           </div>
         </div>

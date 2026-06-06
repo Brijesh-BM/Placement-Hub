@@ -10,7 +10,14 @@ export async function GET() {
     }
 
     const profile = await db.profile.findUnique({
-      where: { userId: userPayload.userId }
+      where: { userId: userPayload.userId },
+      include: {
+        roadmapCompletions: {
+          include: {
+            step: { select: { roadmapId: true } }
+          }
+        }
+      }
     });
 
     const roadmaps = await db.roadmap.findMany({
@@ -23,7 +30,24 @@ export async function GET() {
       orderBy: { title: 'asc' },
     });
 
-    return NextResponse.json({ roadmaps });
+    // Group completed steps by roadmapId
+    const completedStepsMap: { [roadmapId: string]: string[] } = {};
+    
+    // Initialize empty arrays for all roadmaps
+    roadmaps.forEach(r => {
+      completedStepsMap[r.id] = [];
+    });
+
+    if (profile) {
+      profile.roadmapCompletions.forEach(c => {
+        const rId = c.step.roadmapId;
+        if (completedStepsMap[rId]) {
+          completedStepsMap[rId].push(c.stepId);
+        }
+      });
+    }
+
+    return NextResponse.json({ roadmaps, completedStepsMap });
   } catch (error: any) {
     console.error('GET roadmaps error:', error);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });

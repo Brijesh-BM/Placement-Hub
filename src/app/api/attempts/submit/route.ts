@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { calculateReadinessScore } from '@/lib/readiness';
+import { attemptSubmitSchema } from '@/lib/validation';
 
 export async function POST(request: Request) {
   try {
@@ -10,10 +11,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { attemptId, answers } = await request.json();
-    if (!attemptId || !Array.isArray(answers)) {
-      return NextResponse.json({ error: 'Missing parameters' }, { status: 400 });
+    const body = await request.json();
+    const validation = attemptSubmitSchema.safeParse(body);
+    if (!validation.success) {
+      return NextResponse.json(
+        { error: validation.error.issues[0].message },
+        { status: 400 }
+      );
     }
+
+    const { attemptId, answers } = validation.data;
 
     const attempt = await db.attempt.findUnique({
       where: { id: attemptId },
@@ -121,7 +128,7 @@ export async function POST(request: Request) {
           attemptId: attempt.id,
           rank,
           accuracy,
-          topicAnalysis: JSON.stringify(topicAnalysisObj),
+          topicAnalysis: topicAnalysisObj,
         }
       });
 
@@ -170,23 +177,31 @@ export async function POST(request: Request) {
           }
         }
 
-        // C. Update Streaks
+        // C. Update Streaks using lastStreakDate
         const today = new Date();
-        const lastActive = new Date(profile.lastActive);
-        const isSameDay = today.toDateString() === lastActive.toDateString();
-        
+        const todayStr = today.toDateString();
         let newStreak = profile.streak;
-        if (!isSameDay) {
-          const diffTime = Math.abs(today.getTime() - lastActive.getTime());
-          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-          
-          if (diffDays === 1) {
-            newStreak += 1;
-          } else {
-            newStreak = 1; // reset streak if gap is larger than 1 day
+        let updateStreak = false;
+
+        if (profile.lastStreakDate) {
+          const lastStreak = new Date(profile.lastStreakDate);
+          const lastStreakStr = lastStreak.toDateString();
+
+          if (todayStr !== lastStreakStr) {
+            const yesterday = new Date();
+            yesterday.setDate(yesterday.getDate() - 1);
+            const yesterdayStr = yesterday.toDateString();
+
+            if (lastStreakStr === yesterdayStr) {
+              newStreak += 1;
+            } else {
+              newStreak = 1; // Gap larger than 1 day, reset streak
+            }
+            updateStreak = true;
           }
-        } else if (newStreak === 0) {
+        } else {
           newStreak = 1;
+          updateStreak = true;
         }
 
         // D. 7 Day Streak Badge
@@ -204,6 +219,7 @@ export async function POST(request: Request) {
           data: {
             streak: newStreak,
             lastActive: today,
+            lastStreakDate: updateStreak ? today : profile.lastStreakDate,
           }
         });
       }

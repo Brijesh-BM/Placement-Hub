@@ -2,17 +2,21 @@ import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { db } from '@/lib/db';
 import { loginUserSession } from '@/lib/auth';
+import { signupSchema } from '@/lib/validation';
 
 export async function POST(request: Request) {
   try {
-    const { email, password, name, college, branch, gradYear } = await request.json();
-
-    if (!email || !password || !name) {
+    const body = await request.json();
+    const validation = signupSchema.safeParse(body);
+    
+    if (!validation.success) {
       return NextResponse.json(
-        { error: 'Email, password, and name are required.' },
+        { error: validation.error.issues[0].message },
         { status: 400 }
       );
     }
+
+    const { email, password, name, college, branch, gradYear } = validation.data;
 
     // Check if user already exists
     const existingUser = await db.user.findUnique({
@@ -56,7 +60,7 @@ export async function POST(request: Request) {
           userId: user.id,
           collegeId: collegeId,
           branch: branch || null,
-          gradYear: gradYear ? parseInt(gradYear, 10) : null,
+          gradYear: gradYear ? (typeof gradYear === 'number' ? gradYear : parseInt(gradYear, 10)) : null,
           skills: {
             // connect some default skills
           }

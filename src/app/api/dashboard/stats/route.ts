@@ -40,7 +40,9 @@ export async function GET() {
     attempts.forEach(attempt => {
       if (attempt.result && attempt.result.topicAnalysis) {
         try {
-          const analysis = JSON.parse(attempt.result.topicAnalysis);
+          const analysis = typeof attempt.result.topicAnalysis === 'string'
+            ? JSON.parse(attempt.result.topicAnalysis)
+            : (attempt.result.topicAnalysis as any || {});
           Object.keys(analysis).forEach(topic => {
             const acc = analysis[topic]; // percentage accuracy
             if (!subcategoryScores[topic]) {

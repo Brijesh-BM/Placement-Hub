@@ -34,30 +34,50 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Roadmap has no steps' }, { status: 400 });
     }
 
-    // Fetch existing progress
-    const progress = await db.roadmapProgress.findFirst({
+    // Check if completion exists
+    const existingCompletion = await db.roadmapStepCompletion.findUnique({
       where: {
-        profileId: profile.id,
-        roadmapId,
+        profileId_stepId: {
+          profileId: profile.id,
+          stepId,
+        }
       }
     });
 
-    let completedList: string[] = [];
-    if (progress && progress.completedSteps) {
-      completedList = progress.completedSteps.split(',').map(s => s.trim()).filter(Boolean);
-    }
-
-    let isCompleted = false;
-    if (completedList.includes(stepId)) {
-      // Toggle off: remove
-      completedList = completedList.filter(s => s !== stepId);
+    if (existingCompletion) {
+      // Toggle off: delete completion
+      await db.roadmapStepCompletion.delete({
+        where: {
+          profileId_stepId: {
+            profileId: profile.id,
+            stepId,
+          }
+        }
+      });
     } else {
-      // Toggle on: add
-      completedList.push(stepId);
-      isCompleted = true;
+      // Toggle on: create completion
+      await db.roadmapStepCompletion.create({
+        data: {
+          profileId: profile.id,
+          stepId,
+        }
+      });
     }
 
-    const completedStr = completedList.join(',');
+    // Fetch all completed step IDs for this roadmap
+    const completedStepCompletions = await db.roadmapStepCompletion.findMany({
+      where: {
+        profileId: profile.id,
+        step: {
+          roadmapId: roadmapId
+        }
+      },
+      select: {
+        stepId: true
+      }
+    });
+
+    const completedList = completedStepCompletions.map(c => c.stepId);
     const percentageCompleted = parseFloat(((completedList.length / totalSteps) * 100).toFixed(1));
 
     const updatedProgress = await db.roadmapProgress.upsert({
@@ -68,13 +88,11 @@ export async function POST(request: Request) {
         }
       },
       update: {
-        completedSteps: completedStr,
         percentageCompleted,
       },
       create: {
         profileId: profile.id,
         roadmapId,
-        completedSteps: completedStr,
         percentageCompleted,
       }
     });

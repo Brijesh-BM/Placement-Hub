@@ -20,7 +20,7 @@ import {
 interface Question {
   id: string;
   text: string;
-  options: string;
+  options: string | string[];
   correctAnswer: number;
   explanation: string | null;
   difficulty: 'EASY' | 'MEDIUM' | 'HARD';
@@ -202,10 +202,14 @@ export default function AdminPage() {
     if (q) {
       setEditingQId(q.id);
       setQText(q.text);
-      try {
-        setQOptions(JSON.parse(q.options));
-      } catch (e) {
-        setQOptions(q.options.split(','));
+      if (Array.isArray(q.options)) {
+        setQOptions(q.options);
+      } else {
+        try {
+          setQOptions(JSON.parse(q.options));
+        } catch (e) {
+          setQOptions(q.options.split(','));
+        }
       }
       setQCorrect(q.correctAnswer);
       setQExplanation(q.explanation || '');

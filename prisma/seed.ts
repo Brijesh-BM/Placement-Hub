@@ -12,6 +12,7 @@ async function main() {
   await prisma.assessmentInvitation.deleteMany({});
   await prisma.recruiterAssessment.deleteMany({});
   await prisma.recruiterJob.deleteMany({});
+  await prisma.roadmapStepCompletion.deleteMany({}); // New table
   await prisma.roadmapProgress.deleteMany({});
   await prisma.roadmapStep.deleteMany({});
   await prisma.roadmap.deleteMany({});
@@ -24,17 +25,38 @@ async function main() {
   await prisma.answer.deleteMany({});
   await prisma.attempt.deleteMany({});
   await prisma.result.deleteMany({});
+  await prisma.dailyChallengeCompletion.deleteMany({}); // New table
+  await prisma.dailyChallenge.deleteMany({}); // New table
   await prisma.question.deleteMany({});
   await prisma.companyTag.deleteMany({});
   await prisma.test.deleteMany({});
   await prisma.learningNote.deleteMany({});
   await prisma.skillWeight.deleteMany({});
+
+  // Reset new MVP tables
+  await prisma.studentSkillScoreHistory.deleteMany({});
+  await prisma.mockInterview.deleteMany({});
+  await prisma.codingSubmission.deleteMany({});
+  await prisma.codingQuestion.deleteMany({});
+  await prisma.studyPlan.deleteMany({});
+  await prisma.passwordResetToken.deleteMany({});
+  await prisma.emailVerificationToken.deleteMany({});
+  await prisma.practiceSession.deleteMany({});
+  await prisma.userActivity.deleteMany({});
+  await prisma.collegePlacementReport.deleteMany({});
+
+  // Reset standard relational tables in correct order
   await prisma.userBadge.deleteMany({});
   await prisma.badge.deleteMany({});
   await prisma.skill.deleteMany({});
   await prisma.studentSkillScore.deleteMany({});
+  await prisma.onboardingProfile.deleteMany({});
   await prisma.profile.deleteMany({});
+  
+  // Set adminId to null on College to avoid circular dependency before deleting users
+  await prisma.college.updateMany({ data: { adminId: null } });
   await prisma.college.deleteMany({});
+  
   await prisma.subCategory.deleteMany({});
   await prisma.category.deleteMany({});
   await prisma.company.deleteMany({});
@@ -102,6 +124,44 @@ async function main() {
 
   console.log('Seeded User Roles: STUDENT, ADMIN, RECRUITER, COLLEGE_ADMIN');
 
+  // Seed College Placement Reports
+  await prisma.collegePlacementReport.create({
+    data: {
+      collegeId: ldrpCollege.id,
+      year: 2024,
+      totalStudents: 120,
+      placedStudents: 95,
+      avgPackage: 4.8,
+      topPackage: 12.0,
+      topRecruiters: ['TCS', 'Infosys', 'Cognizant'],
+    }
+  });
+
+  await prisma.collegePlacementReport.create({
+    data: {
+      collegeId: ldrpCollege.id,
+      year: 2025,
+      totalStudents: 130,
+      placedStudents: 112,
+      avgPackage: 5.5,
+      topPackage: 18.0,
+      topRecruiters: ['TCS', 'Infosys', 'Wipro', 'Amazon'],
+    }
+  });
+
+  await prisma.collegePlacementReport.create({
+    data: {
+      collegeId: ldrpCollege.id,
+      year: 2026,
+      totalStudents: 150,
+      placedStudents: 125,
+      avgPackage: 6.2,
+      topPackage: 24.0,
+      topRecruiters: ['Amazon', 'TCS', 'Infosys', 'Google'],
+    }
+  });
+  console.log('Seeded College Placement Reports for years 2024, 2025, 2026');
+
   // Create Skills
   const skillNames = [
     'HTML', 'CSS', 'JavaScript', 'React', 'Node.js', 'SQL', 'C++', 'Python', 'Java', 'DBMS', 'OS', 'CN', 'OOP', 'Data Structures & Algorithms'
@@ -140,7 +200,7 @@ async function main() {
       academicStage: '4th Year',
       timeline: 'Within 3 Months',
       objective: 'Placement Preparation',
-      targetCompanies: 'TCS, Infosys, Amazon',
+      targetCompanies: ['TCS', 'Infosys', 'Amazon'], // Seeded as native string array
       confidenceAptitude: 8,
       confidenceReasoning: 7,
       confidenceVerbal: 7,
@@ -227,6 +287,20 @@ async function main() {
       overallScore: 74.0, // calculated from weights
     }
   });
+
+  // Seed time-series history for progress graphs (last 5 days)
+  const historyDates = [5, 4, 3, 2, 1].map(d => new Date(Date.now() - d * 24 * 60 * 60 * 1000));
+  const baseScores = [65.0, 68.0, 70.5, 72.0, 74.0];
+  for (let idx = 0; idx < historyDates.length; idx++) {
+    await prisma.studentSkillScoreHistory.create({
+      data: {
+        profileId: profile.id,
+        date: historyDates[idx],
+        skillName: 'Overall',
+        score: baseScores[idx]
+      }
+    });
+  }
 
   // Create Categories & Subcategories
   const categoriesData = [
@@ -339,12 +413,12 @@ Focused heavily on Data Structures, Algorithms, System Design, and Amazon's 16 L
   const q1 = await prisma.question.create({
     data: {
       text: 'What is a Deadlock in Operating Systems?',
-      options: JSON.stringify([
+      options: [
         'Processes waiting indefinitely for memory that is full',
         'A situation where a set of processes are blocked because each holds a resource and waits for another resource held by another process',
         'A system crash causing disk failures',
         'A compilation link error'
-      ]),
+      ], // Seeded natively as JSON array
       correctAnswer: 1,
       explanation: 'Deadlock requires 4 conditions: Mutual Exclusion, Hold & Wait, No Preemption, Circular Wait.',
       difficulty: 'MEDIUM',
@@ -360,7 +434,7 @@ Focused heavily on Data Structures, Algorithms, System Design, and Amazon's 16 L
   const q2 = await prisma.question.create({
     data: {
       text: 'Which SQL join returns all records when there is a match in either left or right table?',
-      options: JSON.stringify(['LEFT JOIN', 'RIGHT JOIN', 'FULL OUTER JOIN', 'INNER JOIN']),
+      options: ['LEFT JOIN', 'RIGHT JOIN', 'FULL OUTER JOIN', 'INNER JOIN'], // Seeded natively as JSON array
       correctAnswer: 2,
       explanation: 'FULL OUTER JOIN combines left and right outer joins.',
       difficulty: 'EASY',
@@ -629,7 +703,7 @@ Focused heavily on Data Structures, Algorithms, System Design, and Amazon's 16 L
     const q = await prisma.question.create({
       data: {
         text: qData.text,
-        options: JSON.stringify(qData.options),
+        options: qData.options, // Seeded natively as JSON array
         correctAnswer: qData.correctAnswer,
         explanation: qData.explanation,
         difficulty: qData.difficulty as any,
@@ -642,6 +716,21 @@ Focused heavily on Data Structures, Algorithms, System Design, and Amazon's 16 L
         testId: baselineTest.id,
         questionId: q.id,
         order: i + 1,
+      }
+    });
+  }
+
+  // Seed Daily Practice Challenge (today's challenge)
+  const challengeQuestion = await prisma.question.findFirst({
+    where: { subCategory: { name: 'DSA' } }
+  });
+  if (challengeQuestion) {
+    await prisma.dailyChallenge.create({
+      data: {
+        date: new Date(new Date().setUTCHours(0, 0, 0, 0)),
+        questionId: challengeQuestion.id,
+        type: 'MCQ',
+        theme: 'Data Structure Daily'
       }
     });
   }
@@ -687,7 +776,7 @@ Focused heavily on Data Structures, Algorithms, System Design, and Amazon's 16 L
       attemptId: attempt.id,
       rank: 1,
       accuracy: 100.0,
-      topicAnalysis: JSON.stringify({ 'OS': 100.0, 'SQL': 100.0 })
+      topicAnalysis: { 'OS': 100.0, 'SQL': 100.0 } // Seeded natively as JSON object
     }
   });
 
@@ -700,10 +789,10 @@ Focused heavily on Data Structures, Algorithms, System Design, and Amazon's 16 L
   });
 
   const rStep1 = await prisma.roadmapStep.create({
-    data: { roadmapId: sdeRoadmap.id, order: 1, title: 'OOP & Programming', description: 'Basics.', topics: 'Classes, Objects, Polymorphism' }
+    data: { roadmapId: sdeRoadmap.id, order: 1, title: 'OOP & Programming', description: 'Basics.', topics: ['Classes', 'Objects', 'Polymorphism'] }
   });
   const rStep2 = await prisma.roadmapStep.create({
-    data: { roadmapId: sdeRoadmap.id, order: 2, title: 'Data Structures', description: 'Advanced.', topics: 'Arrays, Trees, Graphs' }
+    data: { roadmapId: sdeRoadmap.id, order: 2, title: 'Data Structures', description: 'Advanced.', topics: ['Arrays', 'Trees', 'Graphs'] }
   });
 
   // Seed progress (Completed 1 step)
@@ -711,8 +800,15 @@ Focused heavily on Data Structures, Algorithms, System Design, and Amazon's 16 L
     data: {
       profileId: profile.id,
       roadmapId: sdeRoadmap.id,
-      completedSteps: rStep1.id,
       percentageCompleted: 50.0,
+    }
+  });
+
+  await prisma.roadmapStepCompletion.create({
+    data: {
+      profileId: profile.id,
+      stepId: rStep1.id,
+      timeSpent: 600
     }
   });
 
@@ -767,7 +863,7 @@ Focused heavily on Data Structures, Algorithms, System Design, and Amazon's 16 L
       location: 'Bangalore, India',
       salary: '80,000 / month',
       jobType: 'Internship',
-      requiredSkills: 'C++, Java, SQL, DSA',
+      requiredSkills: ['C++', 'Java', 'SQL', 'DSA'], // Seeded as native string array
       experienceLevel: 'Entry Level',
       cgpaCutoff: 8.0,
       readinessCutoff: 70.0,

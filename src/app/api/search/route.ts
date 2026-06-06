@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth';
 import { db } from '@/lib/db';
+import { asStringArray } from '@/lib/json';
 
 export async function GET(request: Request) {
   try {
@@ -109,17 +110,23 @@ export async function GET(request: Request) {
     });
 
     // 8. Fetch matching Jobs
-    const jobs = await db.recruiterJob.findMany({
-      where: {
-        OR: [
-          { title: { contains: keyword } },
-          { company: { contains: keyword } },
-          { requiredSkills: { contains: keyword } }
-        ]
-      },
-      select: { id: true, title: true, company: true, location: true, salary: true },
-      take: 5
+    // Since requiredSkills is a Json column on SQLite, we fetch all jobs and filter in-memory
+    const allJobs = await db.recruiterJob.findMany({
+      select: { id: true, title: true, company: true, location: true, salary: true, requiredSkills: true }
     });
+    
+    const lowercaseKeyword = keyword.toLowerCase();
+    const jobs = allJobs
+      .filter((job) => {
+        const titleMatch = job.title.toLowerCase().includes(lowercaseKeyword);
+        const companyMatch = job.company.toLowerCase().includes(lowercaseKeyword);
+        const skillsMatch = asStringArray(job.requiredSkills).some((s) =>
+          s.toLowerCase().includes(lowercaseKeyword)
+        );
+        return titleMatch || companyMatch || skillsMatch;
+      })
+      .slice(0, 5)
+      .map(({ requiredSkills, ...jobRest }) => jobRest);
 
     // 9. Fetch matching Company Rounds
     const rounds = await db.companyRound.findMany({

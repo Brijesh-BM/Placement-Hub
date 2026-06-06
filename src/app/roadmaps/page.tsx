@@ -9,12 +9,11 @@ interface Step {
   order: number;
   title: string;
   description: string;
-  topics: string;
+  topics: string | string[];
 }
 
 interface ProgressRecord {
   id: string;
-  completedSteps: string;
   percentageCompleted: number;
 }
 
@@ -42,17 +41,7 @@ export default function RoadmapsPage() {
         const data = await res.json();
         if (data.roadmaps && data.roadmaps.length > 0) {
           setRoadmaps(data.roadmaps);
-          
-          // Populate completed steps from DB
-          const map: { [roadmapId: string]: string[] } = {};
-          data.roadmaps.forEach((r: RoadmapItem) => {
-            if (r.progress && r.progress.length > 0 && r.progress[0].completedSteps) {
-              map[r.id] = r.progress[0].completedSteps.split(',').map(s => s.trim()).filter(Boolean);
-            } else {
-              map[r.id] = [];
-            }
-          });
-          setCompletedStepsMap(map);
+          setCompletedStepsMap(data.completedStepsMap || {});
         }
       }
     } catch (e) {
@@ -214,7 +203,9 @@ export default function RoadmapsPage() {
                 
                 <div className="space-y-4">
                   {activeRoadmap.steps.map((step, idx) => {
-                    const topicsList = step.topics.split(',').map(t => t.trim());
+                    const topicsList = Array.isArray(step.topics)
+                      ? step.topics
+                      : (typeof step.topics === 'string' ? step.topics.split(',').map(t => t.trim()) : []);
                     const isStepDone = completedList.includes(step.id);
 
                     return (

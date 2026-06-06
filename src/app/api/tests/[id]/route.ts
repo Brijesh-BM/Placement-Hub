@@ -42,12 +42,9 @@ export async function GET(
     // Sanitize the questions: Parse JSON options and remove correctAnswer index!
     const sanitizedQuestions = test.testQuestions.map((tq) => {
       const q = tq.question;
-      let opts = [];
-      try {
-        opts = JSON.parse(q.options);
-      } catch (e) {
-        opts = q.options.split(',');
-      }
+      const opts = Array.isArray(q.options)
+        ? q.options
+        : (typeof q.options === 'string' ? JSON.parse(q.options) : []);
 
       return {
         id: q.id,

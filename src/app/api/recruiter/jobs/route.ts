@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth';
 import { db } from '@/lib/db';
 
+import { jobCreateSchema } from '@/lib/validation';
+
 export async function GET() {
   try {
     const userPayload = await getCurrentUser();
@@ -38,6 +40,14 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
+    const validation = jobCreateSchema.safeParse(body);
+    if (!validation.success) {
+      return NextResponse.json(
+        { error: validation.error.issues[0].message },
+        { status: 400 }
+      );
+    }
+
     const {
       title,
       company,
@@ -51,12 +61,12 @@ export async function POST(request: Request) {
       collegeId,
       cgpaCutoff,
       readinessCutoff,
-      testId // Optional: link an assessment test immediately
-    } = body;
+      testId
+    } = validation.data;
 
-    if (!title || !company || !description || !location || !jobType || !requiredSkills || !experienceLevel) {
-      return NextResponse.json({ error: 'Required fields are missing' }, { status: 400 });
-    }
+    const skillsArray = Array.isArray(requiredSkills)
+      ? requiredSkills
+      : requiredSkills.split(',').map((s: string) => s.trim()).filter(Boolean);
 
     const newJob = await db.$transaction(async (tx) => {
       const job = await tx.recruiterJob.create({
@@ -69,11 +79,11 @@ export async function POST(request: Request) {
           salary: salary || null,
           jobType,
           applicationDeadline: applicationDeadline ? new Date(applicationDeadline) : null,
-          requiredSkills,
+          requiredSkills: skillsArray,
           experienceLevel,
           collegeId: collegeId || null,
-          cgpaCutoff: cgpaCutoff ? parseFloat(cgpaCutoff) : null,
-          readinessCutoff: readinessCutoff ? parseFloat(readinessCutoff) : null,
+          cgpaCutoff: cgpaCutoff ? parseFloat(String(cgpaCutoff)) : null,
+          readinessCutoff: readinessCutoff ? parseFloat(String(readinessCutoff)) : null,
         }
       });
 

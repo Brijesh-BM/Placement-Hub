@@ -2,11 +2,21 @@ import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { db } from '@/lib/db';
 import { loginUserSession } from '@/lib/auth';
+import { loginSchema } from '@/lib/validation';
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { email, password, isGoogle, googleEmail, googleName } = body;
+    const validation = loginSchema.safeParse(body);
+    
+    if (!validation.success) {
+      return NextResponse.json(
+        { error: validation.error.issues[0].message },
+        { status: 400 }
+      );
+    }
+
+    const { email, password, isGoogle, googleEmail, googleName } = validation.data;
 
     // 1. Google OAuth Simulation
     if (isGoogle) {

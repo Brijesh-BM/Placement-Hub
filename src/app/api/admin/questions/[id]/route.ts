@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth';
 import { db } from '@/lib/db';
 
+import { questionCreateSchema } from '@/lib/validation';
+
 export async function PUT(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -14,7 +16,16 @@ export async function PUT(
 
     const { id } = await params;
     const body = await request.json();
-    const { text, options, correctAnswer, explanation, difficulty, subCategoryId, companyTags } = body;
+    const validation = questionCreateSchema.partial().safeParse(body);
+    
+    if (!validation.success) {
+      return NextResponse.json(
+        { error: validation.error.issues[0].message },
+        { status: 400 }
+      );
+    }
+
+    const { text, options, correctAnswer, explanation, difficulty, subCategoryId, companyTags } = validation.data;
 
     // Check if question exists
     const question = await db.question.findUnique({
@@ -25,8 +36,6 @@ export async function PUT(
     if (!question) {
       return NextResponse.json({ error: 'Question not found' }, { status: 404 });
     }
-
-    const optionsStr = Array.isArray(options) ? JSON.stringify(options) : options;
 
     // Resolve company tags relations:
     // First, disconnect all current tags, then connect new ones
@@ -48,8 +57,8 @@ export async function PUT(
       where: { id },
       data: {
         text: text || question.text,
-        options: optionsStr || question.options,
-        correctAnswer: correctAnswer !== undefined ? parseInt(correctAnswer, 10) : question.correctAnswer,
+        options: options || (question.options as any),
+        correctAnswer: correctAnswer !== undefined ? correctAnswer : question.correctAnswer,
         explanation: explanation !== undefined ? explanation : question.explanation,
         difficulty: (difficulty || question.difficulty) as any,
         subCategoryId: subCategoryId || question.subCategoryId,
