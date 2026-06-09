@@ -76,9 +76,32 @@ export async function GET() {
 
     // Fallbacks if user hasn't taken enough tests
     if (totalTests === 0) {
-      // Return default roadmap goals or standard categories
-      weakTopics.push('Aptitude', 'Operating Systems');
-      strongTopics.push('OOP', 'DBMS');
+      const profile = await db.profile.findUnique({
+        where: { userId: userPayload.userId },
+        include: { onboardingProfile: true }
+      });
+      const onboarding = profile?.onboardingProfile;
+      if (onboarding) {
+        const topics = [
+          { name: 'Aptitude', score: onboarding.confidenceAptitude },
+          { name: 'Reasoning', score: onboarding.confidenceReasoning },
+          { name: 'Verbal', score: onboarding.confidenceVerbal },
+          { name: 'DSA', score: onboarding.confidenceDsa },
+          { name: 'DBMS', score: onboarding.confidenceDbms },
+          { name: 'Operating Systems', score: onboarding.confidenceOs },
+          { name: 'Computer Networks', score: onboarding.confidenceCn },
+          { name: 'OOP', score: onboarding.confidenceOop },
+        ];
+        topics.forEach(t => {
+          if (t.score >= 7) {
+            strongTopics.push(t.name);
+          } else if (t.score <= 5) {
+            weakTopics.push(t.name);
+          }
+        });
+      }
+      if (strongTopics.length === 0) strongTopics.push('OOP', 'DBMS');
+      if (weakTopics.length === 0) weakTopics.push('Aptitude', 'Operating Systems');
     }
 
     // Build recommendations based on weak areas

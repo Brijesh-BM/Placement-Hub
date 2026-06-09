@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/components/AuthProvider';
 import { 
   Sparkles, 
   Clock, 
@@ -18,25 +19,19 @@ import {
 
 export default function BaselineInfoPage() {
   const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
   const [testId, setTestId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [checkingSession, setCheckingSession] = useState(true);
 
   useEffect(() => {
-    const checkUserAndFetchId = async () => {
-      try {
-        const meRes = await fetch('/api/auth/me');
-        if (!meRes.ok) {
-          router.push('/login');
-          return;
-        }
-        const meData = await meRes.json();
-        if (!meData.user) {
-          router.push('/login');
-          return;
-        }
+    if (authLoading) return;
+    if (!user) {
+      router.push('/login');
+      return;
+    }
 
-        // Fetch Baseline Test ID
+    const fetchTestId = async () => {
+      try {
         const testRes = await fetch('/api/tests/baseline');
         if (testRes.ok) {
           const testData = await testRes.json();
@@ -46,11 +41,10 @@ export default function BaselineInfoPage() {
         console.error(e);
       } finally {
         setLoading(false);
-        setCheckingSession(false);
       }
     };
-    checkUserAndFetchId();
-  }, [router]);
+    fetchTestId();
+  }, [user, authLoading, router]);
 
   const handleStart = async () => {
     if (!testId) {
@@ -78,10 +72,10 @@ export default function BaselineInfoPage() {
     }
   };
 
-  if (checkingSession) {
+  if (authLoading || !user) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <Loader2 className="h-8 w-8 text-indigo-600 animate-spin" />
+        <Loader2 className="h-8 w-8 text-indigo-650 animate-spin" />
       </div>
     );
   }

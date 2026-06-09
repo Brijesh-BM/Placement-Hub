@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth';
 import { db } from '@/lib/db';
+import { roadmapProgressSchema } from '@/lib/validation';
 
 export async function POST(request: Request) {
   try {
@@ -9,10 +10,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { roadmapId, stepId } = await request.json();
-    if (!roadmapId || !stepId) {
-      return NextResponse.json({ error: 'Roadmap ID and Step ID are required' }, { status: 400 });
+    const body = await request.json();
+    const validation = roadmapProgressSchema.safeParse(body);
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error.issues[0].message }, { status: 400 });
     }
+
+    const { roadmapId, stepId } = validation.data;
 
     const profile = await db.profile.findUnique({
       where: { userId: userPayload.userId }

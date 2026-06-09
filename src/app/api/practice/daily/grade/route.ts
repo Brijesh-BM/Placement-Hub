@@ -60,26 +60,42 @@ export async function POST(request: Request) {
     let currentStreak = 0;
     if (profile) {
       const today = new Date();
-      const lastActive = new Date(profile.lastActive);
-      const isSameDay = today.toDateString() === lastActive.toDateString();
-
+      const todayDateOnly = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      
+      let lastStreakDateOnly: Date | null = null;
+      if (profile.lastStreakDate) {
+        const lsd = new Date(profile.lastStreakDate);
+        lastStreakDateOnly = new Date(lsd.getFullYear(), lsd.getMonth(), lsd.getDate());
+      }
+      
       currentStreak = profile.streak;
-      if (!isSameDay) {
-        const diffTime = Math.abs(today.getTime() - lastActive.getTime());
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-        if (diffDays === 1) {
-          currentStreak += 1;
-        } else {
-          currentStreak = 1; // reset if missed
-        }
-      } else if (currentStreak === 0) {
+      let newLastStreakDate = profile.lastStreakDate;
+
+      if (!lastStreakDateOnly) {
         currentStreak = 1;
+        newLastStreakDate = today;
+      } else {
+        const diffTime = todayDateOnly.getTime() - lastStreakDateOnly.getTime();
+        const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+        
+        if (diffDays === 0) {
+          // Already completed today, streak remains unchanged
+        } else if (diffDays === 1) {
+          // Yesterday was the last streak day, increment streak
+          currentStreak += 1;
+          newLastStreakDate = today;
+        } else {
+          // Missed one or more days, reset to 1
+          currentStreak = 1;
+          newLastStreakDate = today;
+        }
       }
 
       await db.profile.update({
         where: { id: profile.id },
         data: {
           streak: currentStreak,
+          lastStreakDate: newLastStreakDate,
           lastActive: today,
         }
       });

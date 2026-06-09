@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/components/AuthProvider';
 import { Search, Filter, BookOpen, Calendar, Building2, Tag, ArrowRight, Loader2, Bookmark, BookmarkCheck, Sparkles, PieChart } from 'lucide-react';
 import Link from 'next/link';
 
@@ -31,6 +33,8 @@ interface Analytics {
 }
 
 export default function PYQPage() {
+  const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
   const [pyqs, setPyqs] = useState<PYQ[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
@@ -96,12 +100,18 @@ export default function PYQPage() {
   };
 
   useEffect(() => {
+    if (authLoading) return;
+    if (!user) {
+      router.push('/login');
+      return;
+    }
     fetchFilters();
-  }, []);
+  }, [user, authLoading, router]);
 
   useEffect(() => {
+    if (authLoading || !user) return;
     fetchPYQs();
-  }, [search, selectedCompany, selectedDifficulty, selectedTopic, selectedYear]);
+  }, [search, selectedCompany, selectedDifficulty, selectedTopic, selectedYear, user, authLoading]);
 
   const handleBookmarkToggle = async (questionId: string) => {
     setBookmarkingId(questionId);
@@ -131,6 +141,15 @@ export default function PYQPage() {
     if (diff === 'MEDIUM') return 'bg-amber-50 border-amber-250 text-amber-700';
     return 'bg-rose-50 border-rose-250 text-rose-700';
   };
+
+  if (authLoading || !user) {
+    return (
+      <div className="flex-1 bg-slate-50 min-h-screen flex flex-col items-center justify-center p-8">
+        <Loader2 className="h-8 w-8 text-indigo-650 animate-spin" />
+        <span className="text-slate-505 mt-4 text-sm font-semibold">Verifying credentials...</span>
+      </div>
+    );
+  }
 
   return (
     <div className="flex-1 bg-slate-50 min-h-screen">

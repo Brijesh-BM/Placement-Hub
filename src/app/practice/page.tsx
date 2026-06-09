@@ -1,7 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useAuth } from '@/components/AuthProvider';
 import { 
   Flame, 
   Play, 
@@ -36,6 +38,8 @@ interface GradedResult {
 }
 
 export default function PracticePage() {
+  const router = useRouter();
+  const { user, loading: authLoading, refreshSession } = useAuth();
   const [streak, setStreak] = useState(0);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [active, setActive] = useState(false);
@@ -56,23 +60,14 @@ export default function PracticePage() {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    const fetchStreak = async () => {
-      try {
-        const res = await fetch('/api/auth/me');
-        if (res.ok) {
-          const data = await res.json();
-          if (data.user) {
-            setStreak(data.user.profile?.streak || 0);
-          }
-        }
-      } catch (e) {
-        console.error(e);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchStreak();
-  }, []);
+    if (authLoading) return;
+    if (!user) {
+      router.push('/login');
+      return;
+    }
+    setStreak(user.profile?.streak || 0);
+    setLoading(false);
+  }, [user, authLoading, router]);
 
   const handleStart = async () => {
     setFetchingQ(true);
@@ -123,6 +118,7 @@ export default function PracticePage() {
         const data = await res.json();
         setGraded(data);
         setStreak(data.streak);
+        await refreshSession();
         setActive(false);
       }
     } catch (e) {
@@ -132,7 +128,7 @@ export default function PracticePage() {
     }
   };
 
-  if (loading) {
+  if (authLoading || !user || loading) {
     return (
       <div className="flex-1 bg-slate-50 min-h-screen flex flex-col items-center justify-center p-8">
         <Loader2 className="h-8 w-8 text-indigo-650 animate-spin" />

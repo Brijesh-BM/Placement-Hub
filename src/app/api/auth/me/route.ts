@@ -8,6 +8,7 @@ export async function GET() {
     if (!userPayload) {
       const response = NextResponse.json({ user: null }, { status: 200 });
       response.cookies.delete('placementhub_token');
+      response.headers.set('Cache-Control', 'no-store, max-age=0, must-revalidate');
       return response;
     }
 
@@ -47,9 +48,21 @@ export async function GET() {
       }
     });
 
-    return NextResponse.json({ user });
+    if (!user) {
+      const response = NextResponse.json({ user: null }, { status: 200 });
+      response.cookies.delete('placementhub_token');
+      response.headers.set('Cache-Control', 'no-store, max-age=0, must-revalidate');
+      return response;
+    }
+
+    const response = NextResponse.json({ user });
+    response.headers.set('Cache-Control', 'no-store, max-age=0, must-revalidate');
+    return response;
   } catch (error: any) {
     console.error('API /auth/me error:', error);
-    return NextResponse.json({ user: null }, { status: 500 });
+    const response = NextResponse.json({ user: null }, { status: 500 });
+    response.cookies.delete('placementhub_token');
+    response.headers.set('Cache-Control', 'no-store, max-age=0, must-revalidate');
+    return response;
   }
 }

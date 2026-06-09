@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/components/AuthProvider';
 import { 
   Users, 
   FileText, 
@@ -71,6 +73,8 @@ interface CategoryWithSub {
 }
 
 export default function AdminPage() {
+  const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
   const [activeTab, setActiveTab] = useState<'overview' | 'questions' | 'tests'>('overview');
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -183,8 +187,13 @@ export default function AdminPage() {
   };
 
   useEffect(() => {
+    if (authLoading) return;
+    if (!user || user.role !== 'ADMIN') {
+      router.push('/dashboard');
+      return;
+    }
     loadData();
-  }, []);
+  }, [user, authLoading, router]);
 
   useEffect(() => {
     if (activeTab === 'questions') {
@@ -340,7 +349,7 @@ export default function AdminPage() {
     }
   };
 
-  if (loading) {
+  if (authLoading || !user || user.role !== 'ADMIN' || loading) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center p-8 bg-zinc-950">
         <Loader2 className="h-8 w-8 text-violet-500 animate-spin" />

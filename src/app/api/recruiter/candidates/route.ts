@@ -9,6 +9,32 @@ export async function GET() {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
+    // 1. Get Recruiter details and check verification status
+    const recruiterUser = await db.user.findUnique({
+      where: { id: userPayload.userId }
+    });
+    
+    const isVerifiedRecruiter = recruiterUser?.isVerified ?? false;
+
+    // 2. Find students invited by this recruiter
+    let invitedStudentIds = new Set<string>();
+    if (isVerifiedRecruiter) {
+      const invitations = await db.assessmentInvitation.findMany({
+        where: {
+          assessment: {
+            job: {
+              recruiterId: userPayload.userId
+            }
+          }
+        },
+        select: {
+          studentId: true
+        }
+      });
+      invitedStudentIds = new Set(invitations.map(i => i.studentId));
+    }
+
+    // 3. Fetch all students
     const students = await db.user.findMany({
       where: { role: 'STUDENT' },
       select: {
@@ -58,10 +84,25 @@ export async function GET() {
         ? parseFloat((mockAvgData.total / mockAvgData.count).toFixed(1))
         : null;
 
+      // Email Display Logic: Only show email if recruiter is verified AND has invited this student
+      const canSeeEmail = isVerifiedRecruiter && invitedStudentIds.has(student.id);
+      let emailDisplay = '***@***.com';
+      if (canSeeEmail) {
+        emailDisplay = student.email;
+      } else if (student.email) {
+        const parts = student.email.split('@');
+        if (parts.length === 2) {
+          const username = parts[0];
+          const domain = parts[1];
+          const maskedUser = username.length > 2 ? username.substring(0, 2) + '***' : '***';
+          emailDisplay = `${maskedUser}@${domain}`;
+        }
+      }
+
       return {
         id: student.id,
         name: student.name,
-        email: student.email,
+        email: emailDisplay,
         branch: student.profile?.branch || null,
         gradYear: student.profile?.gradYear || null,
         cgpa: student.profile?.cgpa || null,

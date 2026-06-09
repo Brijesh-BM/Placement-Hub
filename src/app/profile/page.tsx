@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/components/AuthProvider';
 import { 
   User, 
   Building, 
@@ -85,6 +87,8 @@ interface UserProfile {
 }
 
 export default function ProfilePage() {
+  const router = useRouter();
+  const { user, loading: authLoading, refreshSession } = useAuth();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [colleges, setColleges] = useState<College[]>([]);
   const [bookmarks, setBookmarks] = useState<BookmarkItem[]>([]);
@@ -117,25 +121,22 @@ export default function ProfilePage() {
 
   const fetchProfile = async () => {
     try {
-      const res = await fetch('/api/auth/me');
-      if (res.ok) {
-        const data = await res.json();
-        if (data.user) {
-          setProfile(data.user);
-          setName(data.user.name || '');
-          const p = data.user.profile;
-          if (p) {
-            setCollegeId(p.collegeId || '');
-            setBranch(p.branch || '');
-            setGradYear(p.gradYear?.toString() || '2026');
-            setCgpa(p.cgpa?.toString() || '');
-            setLinkedinUrl(p.linkedinUrl || '');
-            setGithubUrl(p.githubUrl || '');
-            setTargetRole(p.targetRole || 'SOFTWARE_ENGINEER');
-            setSkills(p.skills.map((s: Skill) => s.name) || []);
-            setResumeName(p.resumeName);
-            setResumeUrl(p.resumeUrl);
-          }
+      const userObj = await refreshSession();
+      if (userObj) {
+        setProfile(userObj as unknown as UserProfile);
+        setName(userObj.name || '');
+        const p = userObj.profile;
+        if (p) {
+          setCollegeId(p.collegeId || '');
+          setBranch(p.branch || '');
+          setGradYear(p.gradYear?.toString() || '2026');
+          setCgpa(p.cgpa?.toString() || '');
+          setLinkedinUrl(p.linkedinUrl || '');
+          setGithubUrl(p.githubUrl || '');
+          setTargetRole(p.targetRole || 'SOFTWARE_ENGINEER');
+          setSkills(p.skills.map((s: Skill) => s.name) || []);
+          setResumeName(p.resumeName);
+          setResumeUrl(p.resumeUrl);
         }
       }
 
@@ -158,8 +159,13 @@ export default function ProfilePage() {
   };
 
   useEffect(() => {
+    if (authLoading) return;
+    if (!user) {
+      router.push('/login');
+      return;
+    }
     fetchProfile();
-  }, []);
+  }, [user, authLoading, router]);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -190,7 +196,7 @@ export default function ProfilePage() {
       }
 
       setSuccessMsg('Profile updated successfully!');
-      window.dispatchEvent(new Event('auth-change'));
+      await refreshSession();
       fetchProfile();
     } catch (err: any) {
       setErrorMsg(err.message || 'An error occurred while saving.');
@@ -244,6 +250,7 @@ export default function ProfilePage() {
       setResumeName(data.resumeName);
       setResumeUrl(data.resumeUrl);
       setSuccessMsg('Resume uploaded successfully!');
+      await refreshSession();
     } catch (err: any) {
       setErrorMsg(err.message || 'Failed to upload resume.');
     } finally {
@@ -263,7 +270,7 @@ export default function ProfilePage() {
     setSkills(skills.filter((_, i) => i !== index));
   };
 
-  if (loading) {
+  if (authLoading || !user || loading) {
     return (
       <div className="flex-1 bg-slate-50 min-h-screen flex flex-col items-center justify-center p-8">
         <div className="h-8 w-8 border-4 border-indigo-650 border-t-transparent rounded-full animate-spin"></div>

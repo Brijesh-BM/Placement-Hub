@@ -2,7 +2,11 @@ import jwt from 'jsonwebtoken';
 import { cookies } from 'next/headers';
 import { db } from './db';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'placementhub-super-secret-key-12345';
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  throw new Error('JWT_SECRET environment variable is missing. Configure it in your environment/.env file.');
+}
+const secret = JWT_SECRET as string;
 const COOKIE_NAME = 'placementhub_token';
 
 export interface UserPayload {
@@ -13,12 +17,12 @@ export interface UserPayload {
 }
 
 export function signToken(payload: UserPayload): string {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: '7d' });
+  return jwt.sign(payload, secret, { expiresIn: '7d' });
 }
 
 export function verifyToken(token: string): UserPayload | null {
   try {
-    return jwt.verify(token, JWT_SECRET) as UserPayload;
+    return jwt.verify(token, secret) as UserPayload;
   } catch (e) {
     return null;
   }
@@ -48,7 +52,7 @@ export async function loginUserSession(user: { id: string; email: string; role: 
   cookieStore.set(COOKIE_NAME, token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
+    sameSite: 'strict',
     maxAge: 7 * 24 * 60 * 60, // 7 days
     path: '/',
   });

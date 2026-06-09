@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import { useAuth } from '@/components/AuthProvider';
 import { 
   Award, 
   Flame, 
@@ -69,67 +70,65 @@ interface Notification {
 
 export default function DashboardPage() {
   const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
   const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [userName, setUserName] = useState('');
-  const [streak, setStreak] = useState(0);
-  const [targetRole, setTargetRole] = useState('SOFTWARE_ENGINEER');
-  const [readinessScore, setReadinessScore] = useState<number | null>(null);
-  const [onboardingProfile, setOnboardingProfile] = useState<any>(null);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [showNotifTray, setShowNotifTray] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [statsLoading, setStatsLoading] = useState(true);
   const [mounted, setMounted] = useState(false);
 
-  const fetchDashboardData = async () => {
-    try {
-      const userRes = await fetch('/api/auth/me');
-      if (userRes.ok) {
-        const userData = await userRes.json();
-        if (userData.user) {
-          setUserName(userData.user.name);
-          setStreak(userData.user.profile?.streak || 0);
-          setTargetRole(userData.user.profile?.targetRole || 'SOFTWARE_ENGINEER');
-          setReadinessScore(userData.user.profile?.readinessScore?.overallScore ?? null);
-          
-          if (userData.user.role === 'STUDENT') {
-            const op = userData.user.profile?.onboardingProfile;
-            setOnboardingProfile(op);
-            if (!op || op.completedOnboarding === false) {
-              router.push('/onboarding');
-              return;
-            }
-          }
-        } else {
-          router.push('/login');
-          return;
-        }
-      } else {
-        router.push('/login');
-        return;
-      }
-
-      const statsRes = await fetch('/api/dashboard/stats');
-      if (statsRes.ok) {
-        const statsData = await statsRes.json();
-        setStats(statsData.stats);
-      }
-
-      const notifRes = await fetch('/api/notifications');
-      if (notifRes.ok) {
-        const notifData = await notifRes.json();
-        setNotifications(notifData.notifications || []);
-      }
-    } catch (e) {
-      console.error('Failed to fetch dashboard info', e);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const userName = user?.name || '';
+  const streak = user?.profile?.streak || 0;
+  const targetRole = user?.profile?.targetRole || 'SOFTWARE_ENGINEER';
+  const readinessScore = user?.profile?.readinessScore?.overallScore ?? null;
+  const onboardingProfile = user?.profile?.onboardingProfile ?? null;
 
   useEffect(() => {
     setMounted(true);
-    fetchDashboardData();
   }, []);
+
+  useEffect(() => {
+    if (authLoading) return;
+
+    if (!user) {
+      router.push('/login');
+      return;
+    }
+
+    if (user.role === 'STUDENT') {
+      const op = user.profile?.onboardingProfile;
+      if (!op || op.completedOnboarding === false) {
+        router.push('/onboarding');
+        return;
+      }
+    }
+
+    const fetchStatsAndNotifications = async () => {
+      try {
+        setStatsLoading(true);
+        const [statsRes, notifRes] = await Promise.all([
+          fetch('/api/dashboard/stats'),
+          fetch('/api/notifications')
+        ]);
+
+        if (statsRes.ok) {
+          const statsData = await statsRes.json();
+          setStats(statsData.stats);
+        }
+
+        if (notifRes.ok) {
+          const notifData = await notifRes.json();
+          setNotifications(notifData.notifications || []);
+        }
+      } catch (e) {
+        console.error('Failed to fetch dashboard info', e);
+      } finally {
+        setStatsLoading(false);
+      }
+    };
+
+    fetchStatsAndNotifications();
+  }, [user, authLoading, router]);
 
   const handleMarkAsRead = async (id: string) => {
     try {
@@ -180,12 +179,23 @@ export default function DashboardPage() {
 
   const unreadCount = notifications.filter(n => !n.isRead).length;
 
-  if (loading) {
+  if (authLoading || !user) {
     return (
       <div className="flex-1 bg-slate-50 min-h-screen flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
-          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-650 animate-spin"></div>
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-650"></div>
           <span className="text-sm font-semibold text-slate-500">Loading your command center...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (statsLoading) {
+    return (
+      <div className="flex-1 bg-slate-50 min-h-screen flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-650"></div>
+          <span className="text-sm font-semibold text-slate-500">Loading placement metrics...</span>
         </div>
       </div>
     );

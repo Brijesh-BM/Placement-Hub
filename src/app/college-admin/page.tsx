@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/components/AuthProvider';
 import { GraduationCap, Users, TrendingUp, BookOpen, Search, Filter, Loader2, ArrowRight, CheckCircle2, ChevronRight, Sparkles, ShieldCheck, AlertCircle, Award } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, LineChart, Line, Legend, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 
@@ -52,6 +54,8 @@ interface CollegeData {
 }
 
 export default function CollegeAdminPortal() {
+  const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
   const [data, setData] = useState<CollegeData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -81,10 +85,15 @@ export default function CollegeAdminPortal() {
 
   useEffect(() => {
     setMounted(true);
+    if (authLoading) return;
+    if (!user || user.role !== 'COLLEGE_ADMIN') {
+      router.push('/dashboard');
+      return;
+    }
     fetchStats();
-  }, []);
+  }, [user, authLoading, router]);
 
-  if (loading) {
+  if (authLoading || !user || user.role !== 'COLLEGE_ADMIN' || loading) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center p-8 bg-slate-50 min-h-screen">
         <Loader2 className="h-8 w-8 text-indigo-650 animate-spin" />

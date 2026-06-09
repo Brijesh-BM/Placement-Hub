@@ -1,8 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { usePathname } from 'next/navigation';
+import { useState } from 'react';
+import { useAuth } from '@/components/AuthProvider';
 import { 
   GraduationCap, 
   LayoutDashboard, 
@@ -19,75 +20,23 @@ import {
   X,
   Search,
   HelpCircle,
-  Briefcase
+  Briefcase,
+  Bookmark
 } from 'lucide-react';
-
-interface UserSession {
-  id: string;
-  email: string;
-  name: string;
-  role: 'STUDENT' | 'ADMIN' | 'RECRUITER' | 'COLLEGE_ADMIN';
-}
 
 export default function Navbar() {
   const pathname = usePathname();
-  const router = useRouter();
-  const [user, setUser] = useState<UserSession | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { user, loading, logout } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
 
-  // Fetch session on load
-  const fetchSession = async () => {
-    try {
-      const res = await fetch('/api/auth/me');
-      if (res.ok) {
-        const data = await res.json();
-        if (data.user) {
-          setUser({
-            id: data.user.id,
-            email: data.user.email,
-            name: data.user.name,
-            role: data.user.role,
-          });
-        } else {
-          setUser(null);
-        }
-      } else {
-        setUser(null);
-      }
-    } catch (e) {
-      setUser(null);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchSession();
-    // Listen to custom event for login updates
-    window.addEventListener('auth-change', fetchSession);
-    return () => {
-      window.removeEventListener('auth-change', fetchSession);
-    };
-  }, [pathname]);
-
   const handleLogout = async () => {
-    try {
-      const res = await fetch('/api/auth/logout', { method: 'POST' });
-      if (res.ok) {
-        setUser(null);
-        router.push('/login');
-        // Dispatch event
-        window.dispatchEvent(new Event('auth-change'));
-      }
-    } catch (e) {
-      console.error('Logout failed:', e);
-    }
+    await logout();
   };
 
   const navItems = [
     { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
     { name: 'Tests', path: '/tests', icon: FileText },
+    { name: 'Saved', path: '/saved', icon: Bookmark },
     { name: 'Company Prep', path: '/company-hub', icon: Building2 },
     { name: 'PYQs', path: '/pyq', icon: HelpCircle },
     { name: 'Roadmaps', path: '/roadmaps', icon: Map },

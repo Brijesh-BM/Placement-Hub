@@ -105,6 +105,9 @@ export async function GET(
         topicAnalysis: typeof attempt.result.topicAnalysis === 'string'
           ? JSON.parse(attempt.result.topicAnalysis)
           : (attempt.result.topicAnalysis || {}),
+        recommendations: typeof attempt.result.recommendations === 'string'
+          ? JSON.parse(attempt.result.recommendations)
+          : (attempt.result.recommendations || []),
       } : null,
       answers: answersReview,
     });

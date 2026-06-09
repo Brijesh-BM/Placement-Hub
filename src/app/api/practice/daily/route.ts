@@ -9,8 +9,37 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Load questions categorized
-    const allQuestions = await db.question.findMany({
+    // 1. Fetch only IDs for each category (extremely lightweight database query)
+    const [aptIds, reasoningIds, techIds] = await Promise.all([
+      db.question.findMany({
+        where: { subCategory: { category: { name: 'Aptitude' } } },
+        select: { id: true }
+      }),
+      db.question.findMany({
+        where: { subCategory: { category: { name: 'Reasoning' } } },
+        select: { id: true }
+      }),
+      db.question.findMany({
+        where: { subCategory: { category: { name: 'Technical' } } },
+        select: { id: true }
+      }),
+    ]);
+
+    // Shuffle helper to pick random IDs
+    const getRandomIds = (idsObj: { id: string }[], count: number) => {
+      const shuffled = [...idsObj].sort(() => Math.random() - 0.5);
+      return shuffled.slice(0, count).map(x => x.id);
+    };
+
+    const selectedAptIds = getRandomIds(aptIds, 10);
+    const selectedReasoningIds = getRandomIds(reasoningIds, 10);
+    const selectedTechIds = getRandomIds(techIds, 5);
+
+    const targetIds = [...selectedAptIds, ...selectedReasoningIds, ...selectedTechIds];
+
+    // 2. Fetch full details of ONLY the selected questions
+    const dailySet = await db.question.findMany({
+      where: { id: { in: targetIds } },
       include: {
         subCategory: {
           select: {
@@ -20,19 +49,6 @@ export async function GET() {
         }
       }
     });
-
-    const aptQuestions = allQuestions.filter(q => q.subCategory.category.name === 'Aptitude');
-    const reasoningQuestions = allQuestions.filter(q => q.subCategory.category.name === 'Reasoning');
-    const techQuestions = allQuestions.filter(q => q.subCategory.category.name === 'Technical');
-
-    // Shuffle helper
-    const shuffle = (array: any[]) => array.sort(() => Math.random() - 0.5);
-
-    const selectedApt = shuffle(aptQuestions).slice(0, 10);
-    const selectedReasoning = shuffle(reasoningQuestions).slice(0, 10);
-    const selectedTech = shuffle(techQuestions).slice(0, 5);
-
-    const dailySet = [...selectedApt, ...selectedReasoning, ...selectedTech];
 
     // Sanitize options and remove correctAnswer key
     const sanitizedSet = dailySet.map((q, idx) => {

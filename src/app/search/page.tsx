@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/components/AuthProvider';
 import { Search, Loader2, ArrowRight, FileText, Compass, Map, Building2, MessageSquare, BookOpen, Tag, Briefcase, HelpCircle, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 
@@ -17,6 +19,8 @@ interface SearchResults {
 }
 
 export default function SearchPage() {
+  const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
   const [keyword, setKeyword] = useState('');
   const [results, setResults] = useState<SearchResults | null>(null);
   const [loading, setLoading] = useState(false);
@@ -39,6 +43,12 @@ export default function SearchPage() {
   };
 
   useEffect(() => {
+    if (authLoading) return;
+    if (!user) {
+      router.push('/login');
+      return;
+    }
+
     if (typeof window !== 'undefined') {
       const searchParams = new URLSearchParams(window.location.search);
       const query = searchParams.get('q') || '';
@@ -47,7 +57,7 @@ export default function SearchPage() {
         executeSearch(query);
       }
     }
-  }, []);
+  }, [user, authLoading, router]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -68,6 +78,15 @@ export default function SearchPage() {
       results.rounds.length
     );
   };
+
+  if (authLoading || !user) {
+    return (
+      <div className="flex-1 bg-slate-50 min-h-screen flex flex-col items-center justify-center p-8">
+        <Loader2 className="h-8 w-8 text-indigo-650 animate-spin" />
+        <span className="text-slate-505 mt-4 text-sm font-semibold">Verifying credentials...</span>
+      </div>
+    );
+  }
 
   return (
     <div className="flex-1 bg-slate-50 min-h-screen">

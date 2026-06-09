@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/components/AuthProvider';
 import { Map, ArrowDown, ChevronRight, HelpCircle, BookOpen, Loader2, CheckCircle2, Award, Compass, Sparkles, Check, Lock } from 'lucide-react';
 import Link from 'next/link';
 
@@ -26,6 +28,8 @@ interface RoadmapItem {
 }
 
 export default function RoadmapsPage() {
+  const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
   const [roadmaps, setRoadmaps] = useState<RoadmapItem[]>([]);
   const [activeIdx, setActiveIdx] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -52,8 +56,13 @@ export default function RoadmapsPage() {
   };
 
   useEffect(() => {
+    if (authLoading) return;
+    if (!user) {
+      router.push('/login');
+      return;
+    }
     fetchRoadmaps();
-  }, []);
+  }, [user, authLoading, router]);
 
   const handleToggleStep = async (roadmapId: string, stepId: string) => {
     setTogglingStepId(stepId);
@@ -108,10 +117,10 @@ export default function RoadmapsPage() {
     { name: 'Interview Ready', target: 80, desc: 'Detailed OS systems design & mock panel', active: progressPercent >= 80 }
   ];
 
-  if (loading) {
+  if (authLoading || !user || loading) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center p-8 bg-slate-50 min-h-screen">
-        <Loader2 className="h-8 w-8 text-indigo-600 animate-spin" />
+        <Loader2 className="h-8 w-8 text-indigo-650 animate-spin" />
         <span className="text-slate-500 mt-4 text-sm font-medium">Loading placement roadmaps...</span>
       </div>
     );

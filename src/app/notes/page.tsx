@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/components/AuthProvider';
 import { BookOpen, Folder, Code2, Terminal, ChevronRight, Loader2, Sparkles } from 'lucide-react';
 
 interface NoteItem {
@@ -12,11 +14,19 @@ interface NoteItem {
 }
 
 export default function NotesPage() {
+  const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
   const [notes, setNotes] = useState<NoteItem[]>([]);
   const [selectedIdx, setSelectedIdx] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (authLoading) return;
+    if (!user) {
+      router.push('/login');
+      return;
+    }
+
     const fetchNotes = async () => {
       try {
         const res = await fetch('/api/notes');
@@ -31,9 +41,9 @@ export default function NotesPage() {
       }
     };
     fetchNotes();
-  }, []);
+  }, [user, authLoading, router]);
 
-  if (loading) {
+  if (authLoading || !user || loading) {
     return (
       <div className="flex-1 bg-slate-50 min-h-screen flex flex-col items-center justify-center p-8">
         <Loader2 className="h-8 w-8 text-indigo-650 animate-spin" />

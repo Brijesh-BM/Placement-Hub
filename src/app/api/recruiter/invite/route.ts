@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth';
 import { db } from '@/lib/db';
+import { recruiterInviteSchema } from '@/lib/validation';
 
 export async function POST(request: Request) {
   try {
@@ -9,11 +10,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    const { studentId, jobId, testId } = await request.json();
-
-    if (!studentId || !jobId || !testId) {
-      return NextResponse.json({ error: 'Student, Job, and Test IDs are required' }, { status: 400 });
+    const body = await request.json();
+    const validation = recruiterInviteSchema.safeParse(body);
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error.issues[0].message }, { status: 400 });
     }
+
+    const { studentId, jobId, testId } = validation.data;
 
     // 1. Verify student exists
     const student = await db.user.findFirst({

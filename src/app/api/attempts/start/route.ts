@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth';
 import { db } from '@/lib/db';
+import { attemptStartSchema } from '@/lib/validation';
 
 export async function POST(request: Request) {
   try {
@@ -9,10 +10,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { testId } = await request.json();
-    if (!testId) {
-      return NextResponse.json({ error: 'Test ID is required.' }, { status: 400 });
+    const body = await request.json();
+    const validation = attemptStartSchema.safeParse(body);
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error.issues[0].message }, { status: 400 });
     }
+
+    const { testId } = validation.data;
 
     // Verify test exists
     const test = await db.test.findUnique({

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/components/AuthProvider';
 import { 
   Briefcase, 
   GraduationCap, 
@@ -79,9 +80,9 @@ const SKILL_DOMAINS = [
 
 export default function OnboardingPage() {
   const router = useRouter();
+  const { user, loading: authLoading, refreshSession } = useAuth();
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(false);
-  const [checkingSession, setCheckingSession] = useState(true);
 
   // Form states
   const [targetRole, setTargetRole] = useState('Software Engineer');
@@ -94,29 +95,15 @@ export default function OnboardingPage() {
   );
 
   useEffect(() => {
-    const checkUser = async () => {
-      try {
-        const res = await fetch('/api/auth/me');
-        if (!res.ok) {
-          router.push('/login');
-          return;
-        }
-        const data = await res.json();
-        if (!data.user) {
-          router.push('/login');
-          return;
-        }
-        if (data.user.profile?.onboardingProfile?.completedOnboarding) {
-          router.push('/dashboard');
-        }
-      } catch (e) {
-        console.error(e);
-      } finally {
-        setCheckingSession(false);
-      }
-    };
-    checkUser();
-  }, [router]);
+    if (authLoading) return;
+    if (!user) {
+      router.push('/login');
+      return;
+    }
+    if (user.profile?.onboardingProfile?.completedOnboarding) {
+      router.push('/dashboard');
+    }
+  }, [user, authLoading, router]);
 
   const handleCompanyToggle = (company: string) => {
     setTargetCompanies(prev => 
@@ -164,6 +151,7 @@ export default function OnboardingPage() {
       });
 
       if (res.ok) {
+        await refreshSession();
         router.push('/baseline-info');
       } else {
         const data = await res.json();
@@ -177,7 +165,7 @@ export default function OnboardingPage() {
     }
   };
 
-  if (checkingSession) {
+  if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
         <Loader2 className="h-8 w-8 text-indigo-600 animate-spin" />

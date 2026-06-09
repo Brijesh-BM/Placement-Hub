@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { calculateReadinessScore } from '@/lib/readiness';
+import { profileUpdateSchema } from '@/lib/validation';
+import { TargetRole } from '@prisma/client';
 
 export async function POST(request: Request) {
   try {
@@ -11,7 +13,12 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { name, collegeId, branch, gradYear, cgpa, linkedinUrl, githubUrl, skills, targetRole } = body;
+    const validation = profileUpdateSchema.safeParse(body);
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error.issues[0].message }, { status: 400 });
+    }
+
+    const { name, collegeId, branch, gradYear, cgpa, linkedinUrl, githubUrl, skills, targetRole } = validation.data;
 
     // 1. Update User name
     if (name) {
@@ -43,11 +50,11 @@ export async function POST(request: Request) {
       data: {
         collegeId: collegeId || null,
         branch: branch || null,
-        gradYear: gradYear ? parseInt(gradYear, 10) : null,
-        cgpa: cgpa ? parseFloat(cgpa) : null,
+        gradYear: gradYear ? (typeof gradYear === 'number' ? gradYear : parseInt(gradYear, 10)) : null,
+        cgpa: cgpa ? (typeof cgpa === 'number' ? cgpa : parseFloat(cgpa)) : null,
         linkedinUrl: linkedinUrl || null,
         githubUrl: githubUrl || null,
-        targetRole: targetRole || undefined,
+        targetRole: targetRole ? (targetRole as TargetRole) : undefined,
         skills: {
           set: skillIds, // completely overwrites linked skills with the new list
         },

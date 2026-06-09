@@ -1,8 +1,9 @@
 'use client';
 
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useAuth } from '@/components/AuthProvider';
 import { 
   Award, 
   CheckCircle2, 
@@ -14,7 +15,8 @@ import {
   BookOpen, 
   ArrowLeft,
   Loader2,
-  Clock
+  Clock,
+  Bookmark
 } from 'lucide-react';
 
 interface ResultTopicAnalysis {
@@ -41,6 +43,7 @@ interface ResultData {
     rank: number;
     accuracy: number;
     topicAnalysis: ResultTopicAnalysis;
+    recommendations?: any[];
   } | null;
   answers: Array<{
     questionId: string;
@@ -57,13 +60,22 @@ interface ResultData {
 
 export default function ResultsPage() {
   const params = useParams();
+  const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
   const id = params?.id as string;
 
   const [data, setData] = useState<ResultData | null>(null);
   const [loading, setLoading] = useState(true);
   const [openExplanations, setOpenExplanations] = useState<{ [qId: string]: boolean }>({});
+  const [bookmarkedQuestions, setBookmarkedQuestions] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
+    if (authLoading) return;
+    if (!user) {
+      router.push('/login');
+      return;
+    }
+
     const fetchResults = async () => {
       try {
         const res = await fetch(`/api/results/${id}`);
@@ -78,7 +90,48 @@ export default function ResultsPage() {
       }
     };
     fetchResults();
-  }, [id]);
+  }, [id, user, authLoading, router]);
+
+  useEffect(() => {
+    if (authLoading || !user) return;
+    const fetchBookmarks = async () => {
+      try {
+        const res = await fetch('/api/bookmarks');
+        if (res.ok) {
+          const bData = await res.json();
+          const qBookmarkedMap: Record<string, boolean> = {};
+          bData.bookmarks.forEach((b: any) => {
+            if (b.question) {
+              qBookmarkedMap[b.question.id] = true;
+            }
+          });
+          setBookmarkedQuestions(qBookmarkedMap);
+        }
+      } catch (e) {
+        console.error('Failed to fetch user bookmarks', e);
+      }
+    };
+    fetchBookmarks();
+  }, [user, authLoading]);
+
+  const handleBookmarkQuestion = async (questionId: string) => {
+    try {
+      const res = await fetch('/api/bookmarks/toggle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ questionId }),
+      });
+      if (res.ok) {
+        const bData = await res.json();
+        setBookmarkedQuestions(prev => ({
+          ...prev,
+          [questionId]: bData.bookmarked
+        }));
+      }
+    } catch (e) {
+      console.error('Failed to toggle bookmark', e);
+    }
+  };
 
   const toggleExplanation = (qId: string) => {
     setOpenExplanations(prev => ({
@@ -87,7 +140,7 @@ export default function ResultsPage() {
     }));
   };
 
-  if (loading) {
+  if (authLoading || !user || loading) {
     return (
       <div className="flex-1 bg-slate-50 min-h-screen flex flex-col items-center justify-center p-8">
         <Loader2 className="h-8 w-8 text-indigo-650 animate-spin" />
@@ -227,6 +280,81 @@ export default function ResultsPage() {
         </div>
       </div>
 
+      {/* Recommendations & Actionable Learning Path */}
+      {result?.recommendations && result.recommendations.length > 0 && (
+        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm text-left space-y-6">
+          <div className="border-b border-slate-100 pb-3 flex items-center gap-2">
+            <BookOpen className="h-5 w-5 text-indigo-600" />
+            <h2 className="font-extrabold text-slate-900 text-lg">Actionable Weak-Area Recommendations</h2>
+          </div>
+          
+          <div className="space-y-6">
+            {result.recommendations.map((rec: any, rIdx: number) => (
+              <div key={rIdx} className="p-5 bg-slate-50 border border-slate-200 rounded-xl space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-extrabold text-slate-800">
+                    Target Area: <span className="text-indigo-650">{rec.topic}</span>
+                  </span>
+                  <span className="text-xs font-bold text-rose-600 bg-rose-50 border border-rose-100 px-2 py-0.5 rounded-full">
+                    Accuracy: {rec.score}%
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Recommended notes */}
+                  {rec.recommendedNotes && rec.recommendedNotes.length > 0 && (
+                    <div className="space-y-2">
+                      <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Study Materials</span>
+                      <div className="space-y-1.5">
+                        {rec.recommendedNotes.map((note: any) => (
+                          <Link 
+                            key={note.id} 
+                            href={`/notes?id=${note.id}`}
+                            className="text-xs font-bold text-indigo-600 hover:text-indigo-800 block hover:underline"
+                          >
+                            📖 {note.title}
+                          </Link>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Recommended tests */}
+                  {rec.recommendedTests && rec.recommendedTests.length > 0 && (
+                    <div className="space-y-2">
+                      <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Practice Tests</span>
+                      <div className="space-y-1.5">
+                        {rec.recommendedTests.map((test: any) => (
+                          <Link 
+                            key={test.id} 
+                            href={`/tests?search=${encodeURIComponent(test.title)}`}
+                            className="text-xs font-bold text-indigo-650 hover:text-indigo-800 block hover:underline"
+                          >
+                            📝 {test.title}
+                          </Link>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Prioritized Path */}
+                {rec.prioritizedPath && rec.prioritizedPath.length > 0 && (
+                  <div className="pt-3 border-t border-slate-200">
+                    <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-2">Prioritized Action Path</span>
+                    <ol className="list-decimal pl-4 space-y-1 text-xs text-slate-600 font-semibold">
+                      {rec.prioritizedPath.map((step: string, sIdx: number) => (
+                        <li key={sIdx}>{step}</li>
+                      ))}
+                    </ol>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Answer key list review */}
       <div className="space-y-6 text-left">
         <h2 className="text-xl font-bold text-slate-900 tracking-tight">Assessment Review & Explanations</h2>
@@ -247,7 +375,16 @@ export default function ResultsPage() {
               >
                 {/* Question Info Header */}
                 <div className="flex justify-between items-start text-xs text-slate-450 mb-3.5 font-bold">
-                  <span className="uppercase tracking-wider">Question {idx + 1}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="uppercase tracking-wider">Question {idx + 1}</span>
+                    <button 
+                      onClick={() => handleBookmarkQuestion(ans.questionId)}
+                      className={`p-1 rounded hover:bg-slate-100/50 transition ${bookmarkedQuestions[ans.questionId] ? 'text-amber-500' : 'text-slate-400'}`}
+                      title={bookmarkedQuestions[ans.questionId] ? 'Bookmarked' : 'Bookmark Question'}
+                    >
+                      <Bookmark className={`h-4 w-4 ${bookmarkedQuestions[ans.questionId] ? 'fill-current' : ''}`} />
+                    </button>
+                  </div>
                   <div className="flex items-center gap-2">
                     <span className="px-2 py-0.5 bg-slate-100 border border-slate-200 text-slate-600 rounded-md">
                       {ans.topic}

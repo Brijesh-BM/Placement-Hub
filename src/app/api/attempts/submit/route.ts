@@ -122,6 +122,55 @@ export async function POST(request: Request) {
       });
       const rank = higherAttemptsCount + 1;
 
+      // Generate Recommendations for Weak Areas (< 70%)
+      const weakAreas = Object.keys(topicAnalysisObj)
+        .map(topic => ({ topic, score: topicAnalysisObj[topic] }))
+        .filter(item => item.score < 70.0)
+        .sort((a, b) => a.score - b.score); // Ascending: worst first (Weak area ranking)
+
+      const recommendationsList = [];
+      for (const area of weakAreas.slice(0, 3)) {
+        // Query learning notes
+        const notes = await tx.learningNote.findMany({
+          where: { subCategory: { name: area.topic } },
+          take: 2,
+          select: { id: true, title: true }
+        });
+
+        // Query recommended tests
+        const recommendedTests = await tx.test.findMany({
+          where: {
+            isPublished: true,
+            id: { not: attempt.testId },
+            testQuestions: {
+              some: {
+                question: {
+                  subCategory: { name: area.topic }
+                }
+              }
+            }
+          },
+          take: 2,
+          select: { id: true, title: true }
+        });
+
+        const prioritizedPath: string[] = [];
+        notes.forEach(note => {
+          prioritizedPath.push(`Read the learning note: "${note.title}"`);
+        });
+        recommendedTests.forEach(test => {
+          prioritizedPath.push(`Take the practice test: "${test.title}"`);
+        });
+
+        recommendationsList.push({
+          topic: area.topic,
+          score: area.score,
+          recommendedNotes: notes,
+          recommendedTests: recommendedTests,
+          prioritizedPath
+        });
+      }
+
       // Create Result
       const dbResult = await tx.result.create({
         data: {
@@ -129,8 +178,29 @@ export async function POST(request: Request) {
           rank,
           accuracy,
           topicAnalysis: topicAnalysisObj,
+          recommendations: recommendationsList
         }
       });
+
+      // Update Test global statistics
+      const currentTest = await tx.test.findUnique({
+        where: { id: attempt.testId },
+        select: { attemptCount: true, averageScore: true }
+      });
+      if (currentTest) {
+        const newAttemptCount = currentTest.attemptCount + 1;
+        const newAverageScore = parseFloat(
+          (((currentTest.averageScore * currentTest.attemptCount) + percentage) / newAttemptCount).toFixed(1)
+        );
+
+        await tx.test.update({
+          where: { id: attempt.testId },
+          data: {
+            attemptCount: newAttemptCount,
+            averageScore: newAverageScore
+          }
+        });
+      }
 
       // Update Attempt
       const updatedAttempt = await tx.attempt.update({

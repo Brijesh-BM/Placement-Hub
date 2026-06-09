@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/components/AuthProvider';
 import { 
   MessageSquare, 
   Search, 
@@ -53,13 +55,16 @@ interface ExperienceItem {
 }
 
 export default function InterviewExperiencesPage() {
+  const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
   const [experiences, setExperiences] = useState<ExperienceItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [userId, setUserId] = useState('');
   const [bookmarks, setBookmarks] = useState<string[]>([]);
   
+  const isAdmin = user?.role === 'ADMIN';
+  const userId = user?.id || '';
+
   // Tabs: trending | helpful | recent | company
   const [activeTab, setActiveTab] = useState<'trending' | 'helpful' | 'recent' | 'company'>('trending');
 
@@ -88,15 +93,6 @@ export default function InterviewExperiencesPage() {
 
   const fetchSession = async () => {
     try {
-      const res = await fetch('/api/auth/me');
-      if (res.ok) {
-        const data = await res.json();
-        if (data.user) {
-          setIsAdmin(data.user.role === 'ADMIN');
-          setUserId(data.user.id);
-        }
-      }
-
       const bookmarksRes = await fetch('/api/bookmarks');
       if (bookmarksRes.ok) {
         const bookmarksData = await bookmarksRes.json();
@@ -130,12 +126,18 @@ export default function InterviewExperiencesPage() {
   };
 
   useEffect(() => {
+    if (authLoading) return;
+    if (!user) {
+      router.push('/login');
+      return;
+    }
     fetchSession();
-  }, []);
+  }, [user, authLoading, router]);
 
   useEffect(() => {
+    if (authLoading || !user) return;
     fetchExperiences();
-  }, [search, companyFilter, difficultyFilter]);
+  }, [search, companyFilter, difficultyFilter, user, authLoading]);
 
   const handleOpenModal = () => {
     setCompany('');
@@ -280,6 +282,15 @@ export default function InterviewExperiencesPage() {
   };
 
   const displayList = getSortedExperiences();
+ 
+  if (authLoading || !user || loading) {
+    return (
+      <div className="flex-1 bg-slate-50 min-h-screen flex flex-col items-center justify-center p-8">
+        <Loader2 className="h-8 w-8 text-indigo-650 animate-spin" />
+        <span className="text-slate-500 mt-4 text-sm font-medium">Gathering interview library...</span>
+      </div>
+    );
+  }
 
   return (
     <div className="flex-1 bg-slate-50 min-h-screen">

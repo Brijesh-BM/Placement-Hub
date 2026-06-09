@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/components/AuthProvider';
 import { Briefcase, Users, PlusCircle, CheckCircle, Search, Filter, Loader2, ArrowRight, Award, ShieldCheck, Mail, Database, Building2, Sparkles, Star, Target, Check, ChartColumn } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 
@@ -49,6 +51,8 @@ interface Test {
 }
 
 export default function RecruiterPortal() {
+  const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [colleges, setColleges] = useState<College[]>([]);
@@ -127,8 +131,13 @@ export default function RecruiterPortal() {
 
   useEffect(() => {
     setMounted(true);
+    if (authLoading) return;
+    if (!user || user.role !== 'RECRUITER') {
+      router.push('/dashboard');
+      return;
+    }
     fetchData();
-  }, []);
+  }, [user, authLoading, router]);
 
   const handleCreateJob = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -226,10 +235,10 @@ export default function RecruiterPortal() {
     { name: 'Aptitude', Average: 72 }
   ];
 
-  if (loading) {
+  if (authLoading || !user || user.role !== 'RECRUITER' || loading) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center p-8 bg-slate-50 min-h-screen">
-        <Loader2 className="h-8 w-8 text-indigo-600 animate-spin" />
+        <Loader2 className="h-8 w-8 text-indigo-650 animate-spin" />
         <span className="text-slate-550 mt-4 text-sm font-semibold">Loading recruiter workspace...</span>
       </div>
     );

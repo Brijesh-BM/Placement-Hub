@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
+import { useAuth } from '@/components/AuthProvider';
 import { 
   Sparkles, 
   Award, 
@@ -30,12 +31,19 @@ interface AttemptData {
 export default function PlacementSnapshotPage() {
   const router = useRouter();
   const params = useParams();
+  const { user, loading: authLoading } = useAuth();
   const attemptId = params.id as string;
 
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<AttemptData | null>(null);
 
   useEffect(() => {
+    if (authLoading) return;
+    if (!user) {
+      router.push('/login');
+      return;
+    }
+
     const fetchAttemptData = async () => {
       try {
         const res = await fetch(`/api/results/${attemptId}`);
@@ -52,20 +60,21 @@ export default function PlacementSnapshotPage() {
         setLoading(false);
       }
     };
-
+ 
     if (attemptId) {
       fetchAttemptData();
     }
-  }, [attemptId, router]);
+  }, [attemptId, user, authLoading, router]);
 
   const handleEnterDashboard = () => {
     router.push('/dashboard');
   };
 
-  if (loading) {
+  if (authLoading || !user || loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <Loader2 className="h-8 w-8 text-indigo-600 animate-spin" />
+      <div className="flex-1 flex flex-col items-center justify-center p-8 bg-slate-50 min-h-screen">
+        <Loader2 className="h-8 w-8 text-indigo-650 animate-spin" />
+        <span className="text-slate-500 mt-4 text-sm font-semibold">Generating placement snapshot...</span>
       </div>
     );
   }

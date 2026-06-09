@@ -3,10 +3,13 @@ import { TargetRole } from '@prisma/client';
 
 export async function calculateReadinessScore(profileId: string) {
   try {
-    // 1. Fetch profile and user details
+    // 1. Fetch profile, user, and onboarding details
     const profile = await db.profile.findUnique({
       where: { id: profileId },
-      include: { user: true }
+      include: { 
+        user: true,
+        onboardingProfile: true,
+      }
     });
 
     if (!profile) throw new Error('Student profile not found');
@@ -37,6 +40,16 @@ export async function calculateReadinessScore(profileId: string) {
       skillCounts[sw.skillName] = 0;
     });
 
+    // Fetch subcategories to dynamically map topics/subcategories to category names
+    const subCategories = await db.subCategory.findMany({
+      include: { category: true }
+    });
+    
+    const subCategoryToCategoryMap = new Map<string, string>();
+    subCategories.forEach((sc) => {
+      subCategoryToCategoryMap.set(sc.name, sc.category.name);
+    });
+
     // 4. Calculate average scores per subcategory
     attempts.forEach((att) => {
       if (att.result && att.result.topicAnalysis) {
@@ -44,20 +57,22 @@ export async function calculateReadinessScore(profileId: string) {
           const analysis = typeof att.result.topicAnalysis === 'string'
             ? JSON.parse(att.result.topicAnalysis)
             : (att.result.topicAnalysis as any || {});
+          
           Object.keys(analysis).forEach((topicName) => {
             const percentage = analysis[topicName];
             
-            // Map subcategory names to main skills
-            // In our system, subcategory names like "Probability", "Profit and Loss" map to "Aptitude"
-            // Let's check which main category they belong to or map them directly
+            // Map topic (subcategory) to main skill name dynamically
+            const categoryName = subCategoryToCategoryMap.get(topicName);
             let skillKey = topicName;
             
-            if (['Profit and Loss', 'Percentage', 'Probability', 'Time and Work', 'Time Speed Distance', 'Ratio and Proportion', 'Permutation and Combination'].includes(topicName)) {
-              skillKey = 'Aptitude';
-            } else if (['Blood Relations', 'Direction', 'Seating Arrangement', 'Coding Decoding', 'Puzzles'].includes(topicName)) {
-              skillKey = 'Reasoning';
-            } else if (['Grammar', 'Vocabulary', 'Reading Comprehension', 'Synonyms', 'Antonyms'].includes(topicName)) {
-              skillKey = 'Verbal';
+            if (categoryName) {
+              if (categoryName === 'Technical') {
+                // For Technical category, the subcategory name is the skill name (e.g. DSA, DBMS, OS, CN, OOP)
+                skillKey = topicName;
+              } else {
+                // Otherwise use the main category name (e.g. Aptitude, Reasoning, Verbal)
+                skillKey = categoryName;
+              }
             }
 
             if (skillAverages[skillKey] !== undefined) {
@@ -71,20 +86,18 @@ export async function calculateReadinessScore(profileId: string) {
       }
     });
 
-    // Average them out or fallback to seeded baseline if no attempts made
-    // This ensures that students have a baseline score derived from their initial seed data
+    // Derive baseline scores from student onboarding profile confidence scores
+    const onboarding = profile.onboardingProfile;
     const baselineScores: { [skill: string]: number } = {
-      Aptitude: 80.0,
-      Reasoning: 75.0,
-      Verbal: 70.0,
-      DSA: 65.0,
-      DBMS: 90.0,
-      OS: 60.0,
-      CN: 55.0,
-      OOP: 85.0,
-      HTML: 70.0,
-      React: 68.0,
-      Interview: 72.0,
+      Aptitude: onboarding ? onboarding.confidenceAptitude * 10 : 80.0,
+      Reasoning: onboarding ? onboarding.confidenceReasoning * 10 : 75.0,
+      Verbal: onboarding ? onboarding.confidenceVerbal * 10 : 70.0,
+      DSA: onboarding ? onboarding.confidenceDsa * 10 : 65.0,
+      DBMS: onboarding ? onboarding.confidenceDbms * 10 : 90.0,
+      OS: onboarding ? onboarding.confidenceOs * 10 : 60.0,
+      CN: onboarding ? onboarding.confidenceCn * 10 : 55.0,
+      OOP: onboarding ? onboarding.confidenceOop * 10 : 85.0,
+      Interview: onboarding ? onboarding.confidenceCommunication * 10 : 72.0,
     };
 
     skillWeights.forEach((sw) => {
@@ -92,7 +105,7 @@ export async function calculateReadinessScore(profileId: string) {
       if (skillCounts[name] > 0) {
         skillAverages[name] = parseFloat((skillAverages[name] / skillCounts[name]).toFixed(1));
       } else {
-        // Fallback to baseline
+        // Fallback to onboarding profile baselines
         skillAverages[name] = baselineScores[name] || 60.0;
       }
     });
@@ -145,13 +158,22 @@ export async function calculateReadinessScore(profileId: string) {
       }
     });
 
-    // Save to time-series history
-    await db.studentSkillScoreHistory.create({
-      data: {
-        profileId: profile.id,
-        skillName: 'Overall',
-        score: overallScore,
-      }
+    // Save history logs for overall and each individual skill score to the history table
+    const historyData = [
+      { profileId: profile.id, skillName: 'Overall', score: overallScore },
+      { profileId: profile.id, skillName: 'Aptitude', score: skillAverages['Aptitude'] || 0.0 },
+      { profileId: profile.id, skillName: 'Reasoning', score: skillAverages['Reasoning'] || 0.0 },
+      { profileId: profile.id, skillName: 'Verbal', score: skillAverages['Verbal'] || 0.0 },
+      { profileId: profile.id, skillName: 'DSA', score: skillAverages['DSA'] || 0.0 },
+      { profileId: profile.id, skillName: 'DBMS', score: skillAverages['DBMS'] || 0.0 },
+      { profileId: profile.id, skillName: 'OS', score: skillAverages['OS'] || 0.0 },
+      { profileId: profile.id, skillName: 'CN', score: skillAverages['CN'] || 0.0 },
+      { profileId: profile.id, skillName: 'OOP', score: skillAverages['OOP'] || 0.0 },
+      { profileId: profile.id, skillName: 'Interview', score: skillAverages['Interview'] || 70.0 },
+    ];
+
+    await db.studentSkillScoreHistory.createMany({
+      data: historyData,
     });
 
     return updatedScore;

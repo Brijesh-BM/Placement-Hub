@@ -14,10 +14,35 @@ enum Role {
   COLLEGE_ADMIN
 }
 
+enum InvitationStatus {
+  INVITED
+  COMPLETED
+  SHORTLISTED
+  REJECTED
+}
+
+enum NotificationType {
+  INVITE
+  SHORTLIST
+  BADGE
+  STREAK
+  SYSTEM
+  RECRUITER
+}
+
 enum Difficulty {
   EASY
   MEDIUM
   HARD
+}
+
+enum TestType {
+  TOPIC
+  SECTIONAL
+  MOCK
+  COMPANY
+  BASELINE
+  OA_TEMPLATE
 }
 
 enum AttemptStatus {
@@ -58,6 +83,11 @@ model User {
   passwordHash         String?
   name                 String
   role                 Role                  @default(STUDENT)
+  isVerified           Boolean               @default(false)
+  emailVerified        Boolean               @default(false)
+  failedLoginAttempts  Int                   @default(0)
+  lockedUntil          DateTime?
+  lastLoginAt          DateTime?
   createdAt            DateTime              @default(now())
   updatedAt            DateTime              @updatedAt
   profile              Profile?
@@ -93,6 +123,9 @@ model College {
   adminId     String?
   admin       User?     @relation("CollegeAdmin", fields: [adminId], references: [id])
   students    Profile[]
+  domain      String?
+  isVerified  Boolean   @default(false)
+  website     String?
 
   // New relation connections
   placementReports CollegePlacementReport[]
@@ -111,6 +144,9 @@ model Profile {
   resumeName        String?
   linkedinUrl       String?
   githubUrl         String?
+  phone             String?
+  city              String?
+  profileCompleteness Int             @default(0)
   streak            Int               @default(0)
   lastStreakDate    DateTime?         // New field: correctly track streaks on a calendar basis
   lastActive        DateTime          @default(now())
@@ -222,6 +258,7 @@ model SubCategory {
   categoryId      String
   category        Category      @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   questions       Question[]
+  learningNotes   LearningNote[]
 }
 
 model Question {
@@ -233,6 +270,10 @@ model Question {
   difficulty      Difficulty     @default(EASY)
   type            QuestionType   @default(MCQ)
   isPublished     Boolean        @default(true)
+  frequencyScore  Int            @default(1)    // 1-100 placement frequency
+  askedInCompanies Json          @default(dbgenerated("'[]'")) // JSON string array of companies e.g., ["TCS", "Amazon"]
+  estimatedTime   Int            @default(120)  // estimated time to solve in seconds
+  tags            Json           @default(dbgenerated("'[]'")) // temporary JSON tags
   subCategoryId   String
   subCategory     SubCategory    @relation(fields: [subCategoryId], references: [id], onDelete: Cascade)
   companyTags     CompanyTag[]   @relation("QuestionCompanies")
@@ -241,9 +282,6 @@ model Question {
   createdByUserId String?
   createdBy       User?          @relation("QuestionCreator", fields: [createdByUserId], references: [id])
   bookmarks       Bookmark[]
-  
-  // Relation connections
-  dailyChallenges DailyChallenge[]
 
   @@index([subCategoryId])
   @@index([difficulty])
@@ -262,6 +300,11 @@ model Test {
   description     String?
   duration        Int            @default(60) // in minutes
   isPublished     Boolean        @default(true)
+  difficulty      Difficulty     @default(MEDIUM)
+  type            TestType       @default(MOCK)
+  attemptCount    Int            @default(0)
+  averageScore    Float          @default(0.0)
+  tags            Json           @default(dbgenerated("'[]'")) // temporary JSON tags
   categoryId      String
   category        Category       @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   testQuestions   TestQuestion[]
@@ -270,10 +313,15 @@ model Test {
   company         Company?       @relation(fields: [companyId], references: [id])
   createdByUserId String?
   createdBy       User?          @relation("TestCreator", fields: [createdByUserId], references: [id])
+  shuffleQuestions Boolean        @default(false)
+  negativeMarking  Boolean        @default(false)
+  passingScore     Float?
+  maxAttempts      Int?
   createdAt       DateTime       @default(now())
   
   // Recruiter links
   recruiterAssessments RecruiterAssessment[]
+  companyRound         CompanyRound?
 }
 
 model TestQuestion {
@@ -309,6 +357,7 @@ model Attempt {
   @@index([userId])
   @@index([testId])
   @@index([status])
+  @@index([userId, status])
 }
 
 model Answer {
@@ -333,6 +382,7 @@ model Result {
   rank          Int      @default(1)
   accuracy      Float    @default(0.0)
   topicAnalysis Json     @default(dbgenerated("'{}'")) // Refactored from string to native JSON
+  recommendations Json   @default(dbgenerated("'[]'")) // Prioritized ordered recommendations JSON
 }
 
 model Company {
@@ -358,6 +408,10 @@ model CompanyRound {
   difficulty    Difficulty @default(MEDIUM)
   duration      Int        // minutes
   passingScore  Float      // percentage
+  topics        Json       @default(dbgenerated("'[]'")) // Tested subcategories, e.g. ["Arrays", "Strings"]
+  prepTips      String?    // Markdown round preparation advice
+  testId        String?    @unique
+  test          Test?      @relation(fields: [testId], references: [id], onDelete: SetNull)
 }
 
 model CompanyFaq {
@@ -444,6 +498,8 @@ model InterviewExperience {
   year           Int                   @default(2026)
   roundsText     String?               // e.g. "Coding, Tech Interview, HR"
   prepTips       String?               // Advice
+  isAnonymous    Boolean               @default(false)
+  viewCount      Int                   @default(0)
   createdAt      DateTime              @default(now())
   votes          InterviewExperienceVote[]
   upvoteCount    Int                   @default(0)
@@ -466,27 +522,29 @@ model InterviewExperienceVote {
 }
 
 model LearningNote {
-  id              String     @id @default(uuid())
+  id              String       @id @default(uuid())
   title           String
-  category        String     // DBMS, OS, CN, OOP, SQL (Plain string retained for quick category tags)
-  content         String     // Markdown notes
-  examples        String?    // Markdown examples
-  isPublished     Boolean    @default(true)
+  category        String       // DBMS, OS, CN, OOP, SQL (Plain string retained for quick category tags)
+  content         String       // Markdown notes
+  examples        String?      // Markdown examples
+  isPublished     Boolean      @default(true)
   createdByUserId String?
-  createdBy       User?      @relation("NoteCreator", fields: [createdByUserId], references: [id])
-  createdAt       DateTime   @default(now())
+  createdBy       User?        @relation("NoteCreator", fields: [createdByUserId], references: [id])
+  createdAt       DateTime     @default(now())
   bookmarks       Bookmark[]
+  subCategoryId   String?
+  subCategory     SubCategory? @relation(fields: [subCategoryId], references: [id], onDelete: SetNull)
 }
 
 model Notification {
-  id        String   @id @default(uuid())
+  id        String           @id @default(uuid())
   userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   title     String
   message   String
-  type      String   // e.g. "INVITE", "CHALLENGE", "SHORTLIST", "SYSTEM"
-  isRead    Boolean  @default(false)
-  createdAt DateTime @default(now())
+  type      NotificationType
+  isRead    Boolean          @default(false)
+  createdAt DateTime         @default(now())
 
   @@index([userId, isRead])
 }
@@ -524,6 +582,8 @@ model RecruiterJob {
   readinessCutoff    Float?
   createdAt          DateTime      @default(now())
   assessments        RecruiterAssessment[]
+
+  @@index([recruiterId])
 }
 
 model RecruiterAssessment {
@@ -541,7 +601,7 @@ model AssessmentInvitation {
   assessment   RecruiterAssessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
   studentId    String
   student      User                @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  status       String              @default("INVITED") // INVITED, COMPLETED, SHORTLISTED
+  status       InvitationStatus    @default(INVITED)
   score        Float?
   createdAt    DateTime            @default(now())
 
@@ -554,9 +614,7 @@ model AssessmentInvitation {
 model DailyChallenge {
   id          String   @id @default(uuid())
   date        DateTime @unique
-  questionId  String
-  question    Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
-  type        String   // MCQ, CODING, etc.
+  questions   Json     @default(dbgenerated("'[]'")) // array of question IDs
   theme       String?  // e.g. "DBMS Monday"
   completions DailyChallengeCompletion[]
 }

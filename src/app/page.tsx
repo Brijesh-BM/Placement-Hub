@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { getCurrentUser } from '@/lib/auth';
+import { db } from '@/lib/db';
 import { 
   GraduationCap, 
   ArrowRight, 
@@ -17,6 +18,12 @@ import {
 
 export default async function HomePage() {
   const user = await getCurrentUser();
+  const [questionsCount, testsCount, experiencesCount, companiesCount] = await Promise.all([
+    db.question.count(),
+    db.test.count(),
+    db.interviewExperience.count(),
+    db.company.count(),
+  ]);
 
   return (
     <div className="flex-1 bg-slate-50 min-h-screen flex flex-col justify-center items-center px-4 py-16 relative overflow-hidden select-none">
@@ -77,19 +84,19 @@ export default async function HomePage() {
         {/* Platform Stat Diagnostics (High Information Density) */}
         <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xl grid grid-cols-2 md:grid-cols-4 gap-6 text-left max-w-3xl mx-auto">
           <div className="space-y-1">
-            <span className="text-2xl font-black text-slate-800 block">500+</span>
+            <span className="text-2xl font-black text-slate-800 block">{questionsCount.toLocaleString()}</span>
             <span className="text-[10px] text-slate-400 font-bold uppercase block tracking-wider">Practice Questions</span>
           </div>
           <div className="space-y-1 border-l border-slate-100 pl-6">
-            <span className="text-2xl font-black text-slate-800 block">10+</span>
+            <span className="text-2xl font-black text-slate-800 block">{testsCount.toLocaleString()}</span>
             <span className="text-[10px] text-slate-400 font-bold uppercase block tracking-wider">Simulated Mocks</span>
           </div>
           <div className="space-y-1 border-l border-slate-100 pl-6">
-            <span className="text-2xl font-black text-slate-800 block">50+</span>
+            <span className="text-2xl font-black text-slate-800 block">{experiencesCount.toLocaleString()}</span>
             <span className="text-[10px] text-slate-400 font-bold uppercase block tracking-wider">Interview Logs</span>
           </div>
           <div className="space-y-1 border-l border-slate-100 pl-6">
-            <span className="text-2xl font-black text-slate-800 block">5+</span>
+            <span className="text-2xl font-black text-slate-800 block">{companiesCount.toLocaleString()}</span>
             <span className="text-[10px] text-slate-400 font-bold uppercase block tracking-wider">Companies</span>
           </div>
         </div>
